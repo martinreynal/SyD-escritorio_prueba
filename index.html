@@ -2147,6 +2147,15 @@ body.menu-fijo .placa{display:flex;flex-direction:column;pointer-events:auto}
   box-shadow:0 0 0 2px rgba(0,166,180,.35), 0 0 20px rgba(0,166,180,.3) !important}
 #screen-aporte .vopciones{display:flex;flex-direction:column;gap:9px}
 
+
+/* bajada de la portada */
+.portada__bajada{position:relative;z-index:1;margin:clamp(8px,1.6vh,16px) auto 0;max-width:30ch;
+  font-size:clamp(13px,1.9vh,16px);line-height:1.45;color:rgba(255,255,255,.86);font-weight:300;
+  text-shadow:0 1px 12px rgba(0,0,0,.4)}
+.portada__bajada b{font-weight:700}
+.portada__bajada .es-cielo{color:#67e8f9;text-shadow:0 0 14px rgba(103,232,249,.55)}
+.portada__bajada .es-verde{color:#4ade80;text-shadow:0 0 14px rgba(74,222,128,.55)}
+
 @media (prefers-reduced-motion:reduce){*{transition-duration:.001ms !important}}
 
 /* ==================== MENÚ FIJO · DEFINICIÓN ÚNICA ====================
@@ -2355,6 +2364,9 @@ body.perfil-quieto .panels,body.perfil-quieto .panel{
       <span class="portada__m1">SOÑAR</span>
       <span class="portada__m2">Y DONAR</span>
     </h1>
+
+    <p class="portada__bajada">Nosotros cumplimos tu sueño y vos
+      <b class="es-cielo">donás</b> a tu <b class="es-verde">fundación amiga</b>.</p>
 
     <div class="portada__linea"><i></i></div>
 
