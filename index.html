@@ -3808,15 +3808,18 @@ body.perfil-quieto .panels,body.perfil-quieto .panel{
     padding-left:var(--aire-lat) !important;
     padding-right:var(--aire-lat) !important}
 
-  /* Las pantallas de placa están fijas a los dos bordes y no se pueden
-     centrar con margin: el aire se les da por relleno, calculado contra el
-     ancho de la ventana. */
+  /* Las pantallas de placa están fijas a los dos bordes. Con max-width y
+     márgenes automáticos ya quedan centradas, así que el relleno es sólo el
+     aire contra sus propios bordes. Antes acá se calculaba el relleno contra
+     el ancho de la ventana, y al sumarse al centrado el contenido se comía dos
+     veces el margen: a 1920 el carril de eventos terminaba midiendo 556px en
+     lugar de 1216. */
   #screen-deseos .stats-pantalla,
   #screen-subastas .stats-pantalla,
   #screen-eventos .stats-pantalla,
   #screen-fundaciones .stats-pantalla{
-    padding-left:max(var(--aire-lat), calc((100vw - var(--ancho-max)) / 2)) !important;
-    padding-right:max(var(--aire-lat), calc((100vw - var(--ancho-max)) / 2)) !important}
+    padding-left:var(--aire-lat) !important;
+    padding-right:var(--aire-lat) !important}
 
   .stats-pantalla,.alta,.admin{
     max-width:var(--ancho-max) !important;
@@ -3936,8 +3939,40 @@ body.perfil-quieto .panels,body.perfil-quieto .panel{
   /* Deshabilitada se ve pero no invita: sigue ocupando su lugar para que las
      tarjetas no se corran cuando se llega a una punta. */
   .flecha-carril:disabled{opacity:.3;cursor:default}
-  .flecha-carril--izq{left:max(6px, calc((100vw - var(--ancho-max)) / 2 - 52px))}
-  .flecha-carril--der{right:max(6px, calc((100vw - var(--ancho-max)) / 2 - 52px))}
+  /* Las flechas se posicionan contra .stats-pantalla, no contra la ventana:
+     calcular su desplazamiento con 100vw las metía dentro del carril en cuanto
+     la caja dejaba de tocar los bordes (a 1920 quedaban 236px adentro, encima
+     de las tarjetas). Se anclan al borde de la caja y el carril les cede un
+     hueco lateral propio para que no se pisen. */
+  #screen-subastas .stats-pantalla{
+    padding-left:60px !important;
+    padding-right:60px !important}
+  .flecha-carril--izq{left:6px}
+  .flecha-carril--der{right:6px}
+
+  /* ---- 3b bis. el estado "todavía no hay nada" ----
+     La caja se estiraba a todo el ancho para tres líneas de texto centradas, y
+     encima quedaba pegada arriba con media pantalla vacía debajo. Acotada y
+     centrada se lee como un aviso y no como una franja. */
+  #screen-deseos .esperando,
+  #screen-subastas .esperando,
+  #screen-eventos .esperando{
+    max-width:560px;
+    margin-left:auto;
+    margin-right:auto;
+    padding:44px 32px;
+    gap:14px}
+  #screen-deseos .esperando span,
+  #screen-subastas .esperando span,
+  #screen-eventos .esperando span{max-width:42ch;font-size:15px}
+  /* El centrado vertical se pide sólo cuando el listado está vacío: con
+     tarjetas, la pista tiene que arrancar arriba y ocupar todo el alto. */
+  #screen-deseos .stats-pantalla:has(.esperando),
+  #screen-subastas .stats-pantalla:has(.esperando){
+    justify-content:center;
+    justify-content:safe center}
+  #screen-deseos .stats-pantalla:has(.esperando) > *,
+  #screen-subastas .stats-pantalla:has(.esperando) > *{flex:0 0 auto}
 
   /* ---- 3c. el carril de eventos se centra en el alto disponible ----
      La tarjeta se mide por su contenido, así que en una pantalla alta quedaba
@@ -4017,15 +4052,23 @@ body.perfil-quieto .panels,body.perfil-quieto .panel{
      !important} se lo come, así que quedaba midiendo lo que ocupa su
      contenido.
 
-     Se repone sólo en el paso de elección, con :has(.vopciones). Probado
-     también en el resto de la pantalla: ahí acomoda el botón del formulario,
-     que hoy cae por debajo de la barra, pero al recortar el alto de #apCampos
-     el bloque "Se envía por Gmail" queda pisado por el botón. Ese formulario
-     necesita poder desplazarse, que es un arreglo aparte; hasta entonces
-     conviene no tocarlo. */
-  #screen-aporte.is-active:has(.vopciones){
+     Se repone en el paso de elección y en el formulario de la propuesta, que
+     se distinguen por .vopciones y .tarjeta-form. Probado también en el paso 1
+     del flujo complementario: ahí acomoda el botón, que hoy cae por debajo de
+     la barra, pero al recortar el alto de #apCampos el bloque "Se envía por
+     Gmail" queda pisado por el botón. Ese formulario necesita poder
+     desplazarse, que es un arreglo aparte; hasta entonces conviene no tocarlo.
+
+     El :has(.vopciones) acota el centrado al paso de elección: la misma .alta
+     aloja después el formulario de la propuesta, que sí necesita estirarse a
+     lo alto. Sin ese filtro, centrar y quitarle el crecimiento lo achicaría. */
+  #screen-aporte.is-active:has(.vopciones),
+  #screen-aporte.is-active:has(.tarjeta-form){
     height:100vh !important;
     height:100dvh !important}
+  /* La columna del formulario venía del ancho del teléfono. Un poco más ancha
+     deja respirar los campos sin volverse incómoda de leer. */
+  #screen-aporte .alta:has(.tarjeta-form){max-width:620px !important}
   #screen-aporte .alta:has(.vopciones){
     max-width:880px !important;
     justify-content:center;
@@ -6048,6 +6091,11 @@ function crearCarrilAuto(caja, selItem, solo){
     clearInterval(c.reloj);
     if(!c.solo) return;                // este carril sólo se mueve con el dedo
     if(menosMovimiento()) return;      // sin movimiento automático
+    // En pantalla ancha se ven tres o cuatro tarjetas a la vez y el avance
+    // centra una: las de los costados quedan cortadas por la mitad, incluida
+    // la primera, que se lee como un error de maquetado. Con mouse además hay
+    // flechas y rueda, así que el movimiento solo no aporta nada.
+    if(pantallaAncha()) return;
     c.reloj = setInterval(avanzar, CARRIL_INTERVALO);
   }
   function pausar(){
