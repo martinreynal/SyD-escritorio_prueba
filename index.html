@@ -3014,6 +3014,91 @@ body.perfil-quieto .panels,body.perfil-quieto .panel{
   .intro.se-va{animation:none}
 }
 
+/* ==================== PERFIL PÚBLICO DE UNA FUNDACIÓN ====================
+   Lo primero es saber de quién es el perfil, así que la foto y el nombre van
+   arriba de todo y centrados. Antes había un banner de 150px que empujaba el
+   nombre hacia abajo y no aportaba información: quien llega acá ya eligió a
+   esta fundación en una lista, no necesita que se la vuelvan a vender. */
+.fperfil{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  text-align:center;
+  gap:6px;
+  padding:26px 16px 20px}
+.fperfil__foto{
+  width:112px;height:112px;
+  border-radius:50%;
+  display:grid;place-items:center;
+  font-size:32px;font-weight:700;color:#fff;
+  background-size:cover;background-position:center;
+  border:1px solid var(--canto);
+  box-shadow:0 10px 34px rgba(0,0,0,.45)}
+.fperfil__nombre{
+  display:flex;align-items:center;justify-content:center;
+  flex-wrap:wrap;gap:10px;
+  margin:10px 0 0;
+  font-size:26px;line-height:1.2;font-weight:700;color:#fff;
+  letter-spacing:-.01em}
+.fperfil__dato{margin:0;font-size:13.5px;color:rgba(159,196,216,.85)}
+.fperfil__lema{margin:2px 0 0;font-size:15px;color:rgba(226,240,255,.75);max-width:52ch}
+
+.fperfil__acciones{display:flex;flex-direction:column;gap:10px;padding:0 16px 6px}
+
+/* Nota corta que explica una sección antes de la lista. */
+.fperfil__nota{
+  margin:0 0 12px;
+  font-size:13px;line-height:1.5;
+  color:rgba(159,196,216,.85)}
+
+/* El sitio web es un destino, no una acción de la app: por eso va como fila
+   aparte, con el dominio a la vista para saber adónde lleva antes de tocar. */
+.fperfil__web{
+  display:flex;align-items:center;gap:12px;
+  margin:14px 0 4px;
+  padding:14px 16px;
+  border:1px solid var(--canto);
+  border-radius:14px;
+  background:rgba(255,255,255,.035);
+  color:#fff;text-decoration:none;
+  transition:background .15s, border-color .15s}
+.fperfil__web:hover{background:rgba(255,255,255,.07);border-color:var(--canto-vivo)}
+.fperfil__web svg{width:20px;height:20px;flex:none;color:var(--turq)}
+.fperfil__web span{font-size:14.5px;font-weight:600}
+.fperfil__web-dom{
+  margin-left:auto;
+  font-size:12.5px !important;font-weight:400 !important;
+  color:rgba(159,196,216,.7)}
+
+/* ---- niveles de apoyo mensual ----
+   Se muestran uno al lado del otro para poder compararlos: el monto grande, y
+   debajo qué recibe quien se suma y cuánta gente ya lo hace, que son los dos
+   datos con los que se elige entre un nivel y otro. */
+.fplanes{display:grid;grid-template-columns:1fr;gap:10px}
+.fplan{
+  display:flex;flex-direction:column;gap:6px;
+  padding:16px 18px;
+  border:1px solid var(--canto);
+  border-radius:16px;
+  background:rgba(255,255,255,.035)}
+.fplan.es-mio{border-color:var(--turq);background:rgba(45,212,191,.10)}
+.fplan__nivel{
+  font-size:11px;letter-spacing:.13em;text-transform:uppercase;
+  font-weight:600;color:rgba(159,196,216,.85)}
+.fplan__monto{font-size:24px;font-weight:700;color:#fff;letter-spacing:-.02em}
+.fplan__monto i{font-size:13px;font-weight:500;font-style:normal;
+  color:rgba(159,196,216,.8);margin-left:2px}
+.fplan__que{margin:2px 0 0;font-size:13.5px;line-height:1.45;color:rgba(226,240,255,.8)}
+.fplan__que--vacio{color:rgba(159,196,216,.6)}
+.fplan__gente{
+  margin-top:auto;padding-top:8px;
+  font-size:12px;color:rgba(159,196,216,.7)}
+.fplan .btn{margin-top:10px}
+
+/* Las solapas del perfil llevan aire propio: quedan entre las acciones y el
+   contenido, y sin separación se leían como parte de los botones. */
+.solapas--perfil{margin:16px 0 18px}
+
 /* ==================== PERFIL: QUE SE PUEDA DESPLAZAR ====================
    El perfil se congelaba con overflow:hidden sobre el body, heredado del modo
    aplicación: en un teléfono el contenido entra justo y no hay nada que
@@ -3593,6 +3678,16 @@ body.perfil-quieto{overflow-y:auto !important}
   /* El contenido se corre para dejarle sitio a la barra lateral. */
   body.es-fundacion .screen.is-active{padding-left:var(--nav-lado)}
   body.es-fundacion .nav5{padding-left:12px}
+
+  /* ---- 3g. el perfil público de una fundación ----
+     Los niveles de apoyo se comparan de un vistazo puestos lado a lado, y las
+     dos acciones entran en una fila. */
+  .fplanes{grid-template-columns:repeat(auto-fit, minmax(240px, 1fr))}
+  .fperfil__acciones{flex-direction:row;justify-content:center}
+  .fperfil__acciones .btn{width:auto;min-width:260px}
+  .fperfil__foto{width:132px;height:132px;font-size:38px}
+  .fperfil__nombre{font-size:32px}
+  .fperfil__web{max-width:560px}
 
   /* ---- 4. la barra inferior ----
      Estirada a 1440px los tres íconos quedan desparramados y lejos del
@@ -4764,10 +4859,18 @@ function semilla(){
   (function(){
     var escalas = {fUni:[20000,60000,160000], fAle:[5000,14000,38000], fFav:[9000,25000,70000],
                    fGar:[6000,18000,50000],  fTem:[8000,22000,60000]};
+    // Qué recibe quien se suma a cada nivel. Sin esto los tres niveles se
+    // distinguían sólo por el monto, y elegir entre ellos era adivinar.
+    var beneficios = [
+      "Novedades mensuales por mail con lo que se hizo con tu aporte.",
+      "Todo lo anterior, más el informe trimestral de cuentas y prioridad en las actividades abiertas.",
+      "Todo lo anterior, más una reunión anual con el equipo y mención en la memoria si querés."
+    ];
     DB.fundaciones.forEach(function(f){
       var m = escalas[f.id] || [7000,20000,55000];
       f.planes = m.map(function(monto, i){
-        return {id:nid("pl"), nivel:i+1, nombre:"Nivel "+(i+1), monto:monto, beneficio:""};
+        return {id:nid("pl"), nivel:i+1, nombre:"Nivel "+(i+1), monto:monto,
+                beneficio:beneficios[i] || ""};
       });
     });
   })();
@@ -7313,49 +7416,141 @@ function cerrarFundacion(){
   actualizarCarrusel(false);
   window.scrollTo({top:0, behavior:"smooth"});
 }
+// Qué solapa del perfil público está abierta. Se guarda fuera de la función
+// porque el perfil se vuelve a pintar en cada cambio y no queremos que salte
+// sola a la primera cada vez.
+var solapaFundPub = "info";
+
 function pintarFundacionAbierta(){
   if(!fundacionAbierta) return;
   var f = fundacionPorId(fundacionAbierta); if(!f) return cerrarFundacion();
-  var rank = rankingDe(f.id);
-  var colabs = "";
+
+  // Los posteos de esta fundación, del más nuevo al más viejo.
+  var posts = DB.posts.filter(function(po){ return po.fid === f.id; })
+    .sort(function(a,b){ return String(b.fechaISO||"").localeCompare(String(a.fechaISO||"")); });
+
+  function solapa(id, texto, cuenta){
+    return '<button class="solapa'+(solapaFundPub===id?' is-on':'')+'" data-solapa-fund="'+id+'">'+
+      texto + (cuenta ? ' <i>'+cuenta+'</i>' : '') + '</button>';
+  }
+
+  // ---- lo que se ve primero: quién es ----
+  // Sin banner: una foto grande y el nombre alcanzan para saber dónde estás, y
+  // el banner empujaba todo lo demás fuera de la primera pantalla.
+  var cabecera =
+    '<header class="fperfil">'+
+      '<span class="fperfil__foto" style="'+avatarCSS(f)+'">'+
+        (f.foto ? '' : esc(iniciales(f.nombre)))+'</span>'+
+      '<h1 class="fperfil__nombre">'+esc(f.nombre)+
+        (f.verificada
+          ? '<span class="fverif" title="Fundación verificada">'+
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" '+
+            'stroke-linecap="round" stroke-linejoin="round"><path d="M6 12.4l4 4 8-8.4"/></svg>'+
+            'Verificada</span>'
+          : '')+
+      '</h1>'+
+      '<p class="fperfil__dato">'+esc(f.lugar||"")+
+        (f.desde ? ' · desde '+esc(String(f.desde)) : '')+'</p>'+
+      (f.lema ? '<p class="fperfil__lema">'+esc(f.lema)+'</p>' : '')+
+    '</header>';
+
+  // ---- lo que se puede hacer ----
+  // Donar y aportar valor complementario van juntos y arriba: son las dos
+  // formas de ayudar de una vez. El apoyo mensual tiene su propia sección
+  // porque es una decisión distinta, con niveles que hay que comparar.
+  var acciones = puedeAportar()
+    ? '<div class="fperfil__acciones">'+
+        '<button class="btn btn--primary" data-donar="'+f.id+'">Donar</button>'+
+        '<button class="btn btn--cielo" data-complementario="'+f.id+'">'+
+          'Aportar valor complementario</button>'+
+      '</div>'
+    : '';
+
+  var web = f.web
+    ? '<a class="fperfil__web" href="'+esc(f.web)+'" target="_blank" rel="noopener">'+
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" '+
+        'stroke-linecap="round" stroke-linejoin="round">'+
+        '<circle cx="12" cy="12" r="8.4"/><path d="M3.6 12h16.8"/>'+
+        '<path d="M12 3.6a13 13 0 0 1 0 16.8a13 13 0 0 1 0-16.8z"/></svg>'+
+        '<span>Visitar el sitio web</span>'+
+        '<span class="fperfil__web-dom">'+esc(f.web.replace(/^https?:\/\//,"").replace(/\/$/,""))+'</span>'+
+      '</a>'
+    : '';
+
+  // ---- apoyo mensual, presentado para poder comparar ----
+  // Antes eran tres tarjetas con el monto y poco más. Acá cada nivel dice qué
+  // recibe quien se suma y cuánta gente ya lo hace: son los dos datos con los
+  // que alguien decide entre un nivel y otro.
+  function bloqueApoyo(){
+    var planes = f.planes || [];
+    if(!planes.length){
+      return '<div class="empty">Esta fundación todavía no tiene apoyo mensual.</div>';
+    }
+    return '<p class="fperfil__nota">Un monto fijo por mes, que podés dar de baja '+
+        'cuando quieras. Es lo que le permite a la fundación planificar.</p>'+
+      '<div class="fplanes">'+ planes.map(function(pl){
+        var gente = DB.suscripciones.filter(function(x){
+          return x.fid === f.id && x.planId === pl.id; }).length;
+        var yoEstoy = sesion && DB.suscripciones.some(function(x){
+          return x.planId === pl.id && x.quien === sesion.nombre; });
+        return '<article class="fplan'+(yoEstoy?' es-mio':'')+'">'+
+          '<span class="fplan__nivel">'+esc(pl.nombre)+'</span>'+
+          '<span class="fplan__monto">'+pesos(pl.monto)+'<i>/mes</i></span>'+
+          (pl.beneficio
+            ? '<p class="fplan__que">'+esc(pl.beneficio)+'</p>'
+            : '<p class="fplan__que fplan__que--vacio">Aporte libre, sin contrapartida.</p>')+
+          '<span class="fplan__gente">'+
+            (gente ? gente+(gente===1?' persona apoyando':' personas apoyando')
+                   : 'Todavía nadie')+'</span>'+
+          (puedeAportar()
+            ? '<button class="btn '+(yoEstoy?'btn--ghost':'btn--primary')+' btn--sm" '+
+                'data-suscribir="'+pl.id+'" data-fid="'+f.id+'">'+
+                (yoEstoy?'Dar de baja':'Apoyar todos los meses')+'</button>'
+            : '')+
+        '</article>';
+      }).join("") +'</div>';
+  }
+
+  // ---- contenido de cada solapa ----
+  var info =
+    '<p class="subhead"><span>Quiénes somos</span></p>'+
+    bloquePresentacion(f)+
+    web+
+
+    '<p class="subhead" id="anclaPlanes"><span>Apoyo mensual</span></p>'+
+    bloqueApoyo()+
+
+    '<div class="titulazo"><h3>Campañas <b>abiertas</b></h3>'+
+      '<span class="titulazo__nota">'+(f.causas||[]).length+' en curso · cada una con su meta</span></div>'+
+    ((f.causas||[]).length
+      ? '<div class="stack">'+f.causas.map(function(c){ return bloqueCausa(c, f.id, false); }).join("")+'</div>'
+      : '<div class="empty">Sin campañas cargadas.</div>')+
+
+    '<p class="subhead" id="anclaEventos"><span>Próximos eventos</span></p>'+
+    ((f.eventos||[]).length
+      ? '<div class="stack">'+f.eventos.map(function(e){ return bloqueEvento(e, f.id, false); }).join("")+'</div>'
+      : '<div class="empty">Sin eventos cargados.</div>')+
+
+    bloqueContacto(f);
+
+  var comunidad =
+    '<p class="fperfil__nota">Lo que la fundación fue contando: sueños cumplidos, '+
+      'actividades y rendiciones de lo recaudado.</p>'+
+    '<div class="feed">'+
+      (posts.length
+        ? posts.map(bloquePost).join("")
+        : '<div class="empty">Esta fundación todavía no publicó nada.</div>')+
+    '</div>';
 
   $("#vistaDetalle").innerHTML =
     '<button class="volver" id="btnVolverLista">&#8592; Volver a fundaciones</button>'+
-    '<div class="ficha"><div class="banner" style="height:150px;'+bannerCSS(f)+'"></div>'+
-      '<div class="ficha__id"><span class="avatar avatar--lg" style="'+avatarCSS(f)+'">'+(f.foto?"":esc(iniciales(f.nombre)))+'</span>'+
-      '<div style="padding-bottom:4px;flex:1"><div class="ficha__nombre">'+esc(f.nombre)+'</div>'+
-      '<div class="ficha__lugar">'+esc(f.lugar)+' · '+esc(f.lema)+'</div></div>'+
-      '</div></div>'+
-    (puedeAportar()
-      ? '<div class="ficha__acciones">'+
-          '<button class="btn btn--primary" data-donar="'+f.id+'">Donar</button>'+
-          '<button class="btn btn--cielo" data-complementario="'+f.id+'">Aportar valor complementario</button>'+
-          '<button class="btn btn--primary" data-apoyo-mensual="'+f.id+'">Sumarme al apoyo mensual</button>'+
-        '</div>'
-      : '')+
-
-    bloqueContacto(f)+
-
-    '<p class="subhead"><span>Quiénes somos</span></p>'+
-    bloquePresentacion(f)+
-
-    '<div class="titulazo"><h3>Campañas <b>abiertas</b></h3>'+
-      '<span class="titulazo__nota">'+f.causas.length+' en curso · cada una con su meta</span></div>'+
-    (f.causas.length ? '<div class="stack">'+f.causas.map(function(c){ return bloqueCausa(c, f.id, false); }).join("")+'</div>'
-      : '<div class="empty">Sin campañas cargadas.</div>')+
-    (f.aporteGeneral>0 ? '<div class="aporte-general" style="margin-top:16px"><span class="eyebrow">Aporte general recibido</span>'+
-      '<div style="font-size:16px;font-weight:600;margin-top:4px">'+pesos(f.aporteGeneral)+'</div></div>' : '')+
-
-
-    '<p class="subhead" id="anclaPlanes"><span>Plan de aportes mensual</span></p>'+
-    bloquePlanes(f, false)+
-
-    '<p class="subhead" id="anclaEventos"><span>Próximos eventos</span></p>'+
-    (f.eventos.length ? '<div class="stack">'+f.eventos.map(function(e){ return bloqueEvento(e, f.id, false); }).join("")+'</div>'
-      : '<div class="empty">Sin eventos cargados.</div>')+
-
-
-    '';
+    cabecera +
+    acciones +
+    '<div class="solapas solapas--perfil">'+
+      solapa("info", "La fundación")+
+      solapa("comunidad", "Comunidad", posts.length)+
+    '</div>'+
+    (solapaFundPub === "comunidad" ? comunidad : info);
 }
 
 /* ==================== flujos: fundación ==================== */
@@ -8563,6 +8758,56 @@ function gentePorFundacion(f){
   return Object.keys(mapa).map(function(k){ return mapa[k]; });
 }
 
+// Un posteo, tal como se ve tanto en el muro de la fundación como en el perfil
+// que mira el donante: una sola definición para que no se separen con el tiempo.
+function bloquePost(po){
+  var fu = fundacionPorId(po.fid);
+  if(!fu) return "";
+  var mg = DB.megusta[po.id] || 0;
+  var lodi = DB.miMeGusta[po.id];
+  var sueno = po.suenoDe
+    ? '<div class="post__sueno">'+
+        '<svg viewBox="0 0 32 32" fill="none" aria-hidden="true">'+
+        '<path d="M15.2 3.4l2.6 5.7 6.2.75-4.6 4.3 1.25 6.15-5.45-3.1-5.45 3.1 1.25-6.15-4.6-4.3 6.2-.75z" '+
+        'fill="currentColor" fill-opacity=".22" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>'+
+        '<span>Sueño cumplido de <b>'+esc(po.suenoDe)+'</b></span>'+
+      '</div>'
+    : '';
+
+  return '<article class="post">'+
+    '<header class="post__cab">'+
+      '<span class="post__av"'+(fu.foto?' style="background-image:url('+fu.foto+')"':'')+'>'+
+        (fu.foto ? '' : esc(iniciales(fu.nombre)))+'</span>'+
+      '<span class="post__quien"><b>'+esc(fu.nombre)+'</b>'+
+        '<span>'+esc(po.fecha || "")+'</span></span>'+
+    '</header>'+
+
+    (po.foto
+      ? '<div class="post__foto" style="background-image:url('+po.foto+')"></div>'
+      : '')+
+
+    '<div class="post__cuerpo">'+
+      sueno+
+      '<h3 class="post__t">'+esc(po.titulo || "")+'</h3>'+
+      (po.texto ? '<p class="post__d">'+esc(po.texto)+'</p>' : '')+
+      (po.monto ? '<p class="post__monto">'+pesos(po.monto)+' recaudados</p>' : '')+
+    '</div>'+
+
+    '<footer class="post__pie">'+
+      '<button class="post__mg'+(lodi?' es-on':'')+'" data-megusta="'+po.id+'">'+
+        '<svg viewBox="0 0 24 24" fill="'+(lodi?'currentColor':'none')+'" stroke="currentColor" '+
+        'stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">'+
+        '<path d="M12 20.4s-7.3-4.6-7.3-9.6a4.2 4.2 0 0 1 7.3-2.7 4.2 4.2 0 0 1 7.3 2.7c0 5-7.3 9.6-7.3 9.6z"/></svg>'+
+        (mg ? '<i>'+mg+'</i>' : '')+
+      '</button>'+
+      '<span class="post__tipo">'+
+        (po.tipo === "rendicion" ? "Rendición" : (po.suenoDe ? "Sueño cumplido" : "Actividad"))+
+      '</span>'+
+    '</footer>'+
+  '</article>';
+  }
+
+
 function pintarComunidad(){
   var f = miFundacion(); if(!f) return;
   var caja = $("#comunidadCuerpo"); if(!caja) return;
@@ -8573,51 +8818,7 @@ function pintarComunidad(){
       return String(b.fechaISO||"").localeCompare(String(a.fechaISO||""));
     });
 
-  function tarjeta(po){
-    var fu = fundacionPorId(po.fid) || f;
-    var mg = DB.megusta[po.id] || 0;
-    var lodi = DB.miMeGusta[po.id];
-    var sueno = po.suenoDe
-      ? '<div class="post__sueno">'+
-          '<svg viewBox="0 0 32 32" fill="none" aria-hidden="true">'+
-          '<path d="M15.2 3.4l2.6 5.7 6.2.75-4.6 4.3 1.25 6.15-5.45-3.1-5.45 3.1 1.25-6.15-4.6-4.3 6.2-.75z" '+
-          'fill="currentColor" fill-opacity=".22" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>'+
-          '<span>Sueño cumplido de <b>'+esc(po.suenoDe)+'</b></span>'+
-        '</div>'
-      : '';
-
-    return '<article class="post">'+
-      '<header class="post__cab">'+
-        '<span class="post__av"'+(fu.foto?' style="background-image:url('+fu.foto+')"':'')+'>'+
-          (fu.foto ? '' : esc(iniciales(fu.nombre)))+'</span>'+
-        '<span class="post__quien"><b>'+esc(fu.nombre)+'</b>'+
-          '<span>'+esc(po.fecha || "")+'</span></span>'+
-      '</header>'+
-
-      (po.foto
-        ? '<div class="post__foto" style="background-image:url('+po.foto+')"></div>'
-        : '')+
-
-      '<div class="post__cuerpo">'+
-        sueno+
-        '<h3 class="post__t">'+esc(po.titulo || "")+'</h3>'+
-        (po.texto ? '<p class="post__d">'+esc(po.texto)+'</p>' : '')+
-        (po.monto ? '<p class="post__monto">'+pesos(po.monto)+' recaudados</p>' : '')+
-      '</div>'+
-
-      '<footer class="post__pie">'+
-        '<button class="post__mg'+(lodi?' es-on':'')+'" data-megusta="'+po.id+'">'+
-          '<svg viewBox="0 0 24 24" fill="'+(lodi?'currentColor':'none')+'" stroke="currentColor" '+
-          'stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">'+
-          '<path d="M12 20.4s-7.3-4.6-7.3-9.6a4.2 4.2 0 0 1 7.3-2.7 4.2 4.2 0 0 1 7.3 2.7c0 5-7.3 9.6-7.3 9.6z"/></svg>'+
-          (mg ? '<i>'+mg+'</i>' : '')+
-        '</button>'+
-        '<span class="post__tipo">'+
-          (po.tipo === "rendicion" ? "Rendición" : (po.suenoDe ? "Sueño cumplido" : "Actividad"))+
-        '</span>'+
-      '</footer>'+
-    '</article>';
-  }
+  var tarjeta = bloquePost;
 
   caja.innerHTML =
     '<button class="post-nuevo" id="btnPublicarSueno">'+
@@ -10362,6 +10563,11 @@ document.addEventListener("click", function(e){
   // atributo seguido de "=". Sin ella, ninguna cabecera volvía a ningún lado.
   if(e.target.closest("[data-volver-inicio]")) return volverHome();
   if(e.target.closest("#btnVolverLista")) return cerrarFundacion();
+  if((t = e.target.closest("[data-solapa-fund]"))){
+    solapaFundPub = t.dataset.solapaFund;
+    pintarFundacionAbierta();
+    return;
+  }
   // Dentro de la tarjeta hay etiquetas que llevan a la fundación: tienen prioridad.
   if((t = e.target.closest("[data-editar]"))){
     if(t.dataset.editar === "fundacion") modalEditarFundacion();
