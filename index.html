@@ -3276,6 +3276,31 @@ body.perfil-quieto{overflow-y:auto !important}
 
    El !important aparece sólo donde hay que ganarle a un !important previo
    (las reglas de "app móvil" fuerzan width:100% y padding fijo). */
+/* Cuenta de destino y confirmación de giro, dentro del bloque de saldo de la
+   fundación. Nuevo: va al final para no pelear con la cascada. */
+.rec-cuenta{display:flex;align-items:center;gap:10px;margin-top:12px;
+  padding-top:12px;border-top:1px solid var(--canto)}
+.rec-cuenta__t{flex:1;min-width:0}
+.rec-cuenta__r{display:block;font-size:12px;color:rgba(255,255,255,.6)}
+.rec-cuenta__v{display:block;margin-top:2px;font-size:14px;font-weight:700;color:#fff;
+  font-variant-numeric:tabular-nums;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rec-cuenta__v.es-falta{color:#f6c453}
+.rec-cuenta .btn{flex:none}
+.rec-saldo>.btn--block{margin-top:12px}
+.rec-saldo__ult{display:block;margin-top:10px;font-size:12.5px;color:rgba(255,255,255,.6)}
+.rec-saldo__ult.es-falta{color:#f6c453}
+.rec-saldo__p.es-falta{color:#f6c453}
+.rec-confirma{padding:12px 14px;border-radius:14px;background:var(--vidrio);
+  box-shadow:0 0 0 1px var(--canto);margin-bottom:10px}
+.rec-confirma span{display:block;font-size:12px;color:rgba(255,255,255,.6)}
+.rec-confirma b{display:block;margin-top:2px;font-size:22px;font-weight:800;color:#fff}
+.rec-confirma--cuenta b{font-size:14px;font-variant-numeric:tabular-nums}
+.rec-confirma i{display:block;margin-top:4px;font-style:normal;font-size:12.5px;color:var(--turq)}
+/* El extracto: la columna de concepto es 1fr y sin min-width:0 empujaba al
+   monto hasta partirlo letra por letra en celular. */
+.mov__c{min-width:0}
+.mov__m{white-space:nowrap}
+
 @media (min-width:940px){
 
   /* Ancho útil del contenido y aire contra los bordes. Se definen una vez
@@ -4385,6 +4410,8 @@ function semilla(){
   DB.invitaciones = [];
 
   DB.complementarios = [];
+  // Transferencias que la fundación confirmó recibidas en su cuenta.
+  DB.transferencias = [];
   DB.usuarios = [];
   DB.vistas = {fund:{}, camp:{}};
   DB.bajas = [];
@@ -6295,7 +6322,9 @@ function pintarPanelFundacion(){
        esperando + (esperando===1 ? ' sueño esperando' : ' sueños esperando'),
        'Aprobados, a la espera de salir']);
      if(porGirar) filas.push(['fRecauda', pesos(porGirar)+' por acreditarse',
-       'Se transfiere el 5 de cada mes']);
+       cuentaBanco(f) ? 'Se transfiere el 5 de cada mes' : 'Falta la cuenta de destino']);
+     if(!cuentaBanco(f)) filas.push(['fRecauda', 'Falta cargar el CBU',
+       'Sin cuenta no se puede acreditar lo recaudado']);
 
      if(!filas.length){
        return '<p class="frotulo">Para hoy</p>'+
@@ -8108,6 +8137,99 @@ function avisarFundacion(fid, titulo, texto, destino, clase){
     destino:destino || "recaudacion", clase:clase || "actividad", leido:false});
 }
 
+// Cuenta de destino de la fundación. Vive en legales.banco como texto
+// ("CBU 0110…" o un alias). Se limpia al guardar y se muestra agrupada.
+function cuentaBanco(f){
+  var b = f && f.legales && f.legales.banco ? String(f.legales.banco).trim() : "";
+  return b.replace(/^cbu\s*/i, "").replace(/\s+/g, "");
+}
+function cuentaBancoBonita(f){
+  var c = cuentaBanco(f);
+  if(!c) return "";
+  if(/^\d{22}$/.test(c)) return "CBU " + c.replace(/(\d{4})(?=\d)/g, "$1 ");
+  return "Alias " + c;
+}
+// Devuelve el error de validación, o "" si la cuenta sirve.
+function validarCuentaBanco(txt){
+  var c = String(txt || "").trim().replace(/^cbu\s*/i, "").replace(/\s+/g, "");
+  if(!c) return "Escribí el CBU o el alias de la cuenta.";
+  if(/^\d+$/.test(c)) return c.length === 22 ? "" : "El CBU tiene 22 dígitos; este tiene "+c.length+".";
+  if(/^[a-z0-9.\-]{6,20}$/i.test(c)) return "";
+  return "Un alias tiene entre 6 y 20 letras, números, puntos o guiones.";
+}
+function modalCuentaBancaria(){
+  var f = miFundacion(); if(!f) return;
+  var actual = cuentaBanco(f);
+  abrirModal({eyebrow:"Recaudación", titulo: actual ? "Cambiar cuenta de destino" : "Cargar cuenta de destino",
+    sub:"Acá se acredita el saldo pendiente el 5 de cada mes. Tiene que estar a nombre de la fundación.",
+    body: campo("cbCuenta","CBU o alias","text","0110599520000012437851",
+            '<p class="field__hint">22 dígitos, o el alias de la cuenta. Sin espacios.</p>')+
+          campo("cbTitular","Titular","text","",
+            '<p class="field__hint">Como figura en el banco. Se controla contra la razón social.</p>'),
+    ok: actual ? "Guardar cuenta" : "Cargar cuenta",
+    after:function(){
+      $("#cbCuenta").value = actual;
+      $("#cbTitular").value = (f.legales && (f.legales.titular || f.legales.razon)) || f.nombre || "";
+    },
+    onOk:function(){
+      var err = validarCuentaBanco(val("cbCuenta"));
+      if(err){ toast(err); return; }
+      var c = val("cbCuenta").replace(/^cbu\s*/i, "").replace(/\s+/g, "");
+      if(!f.legales) f.legales = {};
+      f.legales.banco = /^\d{22}$/.test(c) ? "CBU " + c : c;
+      f.legales.titular = val("cbTitular");
+      cerrarModal(); pintarTodo(); pintarFSubastas();
+      toast(actual ? "Cuenta actualizada." : "Cuenta cargada. El próximo giro va ahí.");
+    }});
+}
+// Lo cobrado que todavía no se giró, para la fundación en sesión.
+function pendienteDeGiro(f){
+  var lotes = DB.aportes.filter(function(a){ return a.fid === f.id; });
+  var monto = 0, items = 0;
+  lotes.forEach(function(a){
+    var e = estadoLote(a);
+    if(["porcobrar","cobrado"].indexOf(e.id) > -1 && !a.transferido){
+      monto += (a.puja || a.base || 0); items++;
+    }
+  });
+  DB.donaciones.forEach(function(d){
+    if(d.fid === f.id && d.transferido === false){ monto += (d.monto || 0); items++; }
+  });
+  return {monto:monto, items:items};
+}
+function modalTransferenciaRecibida(){
+  var f = miFundacion(); if(!f) return;
+  var p = pendienteDeGiro(f);
+  if(!p.monto){ toast("No hay saldo pendiente de transferencia."); return; }
+  abrirModal({eyebrow:"Recaudación", titulo:"Confirmar transferencia recibida",
+    sub:"Marcá el giro como acreditado sólo cuando lo veas en el extracto del banco.",
+    body:'<div class="rec-confirma">'+
+           '<span>Monto del giro</span><b>'+pesos(p.monto)+'</b>'+
+           '<i>'+p.items+(p.items===1?' movimiento pasa':' movimientos pasan')+' a “Transferido”.</i>'+
+         '</div>'+
+         '<div class="rec-confirma rec-confirma--cuenta">'+
+           '<span>Cuenta de destino</span><b>'+esc(cuentaBancoBonita(f))+'</b>'+
+         '</div>',
+    ok:"Sí, la recibí",
+    onOk:function(){
+      DB.aportes.forEach(function(a){
+        if(a.fid !== f.id || a.transferido) return;
+        var e = estadoLote(a);
+        if(["porcobrar","cobrado"].indexOf(e.id) > -1) a.transferido = true;
+      });
+      DB.donaciones.forEach(function(d){
+        if(d.fid === f.id && d.transferido === false) d.transferido = true;
+      });
+      DB.transferencias.push({id:nid("tr"), fid:f.id, monto:p.monto, items:p.items,
+        cuando:new Date().toISOString()});
+      avisarFundacion(f.id, "Transferencia recibida",
+        pesos(p.monto)+" acreditados en tu cuenta. El extracto ya figura como transferido.",
+        "recaudacion", "aporte");
+      cerrarModal(); pintarTodo(); pintarFSubastas();
+      toast("Transferencia registrada.");
+    }});
+}
+
 // Para la fundación, en lugar de un ícono de color va una etiqueta que nombra
 // el tipo de movimiento. Se lee, se entiende sin aprender los colores y sirve
 // para comparar filas entre sí.
@@ -8974,15 +9096,46 @@ function pintarFSubastas(){
     '<div class="rec-saldo">'+
       '<span class="rec-saldo__r">Saldo pendiente de transferencia</span>'+
       '<b class="rec-saldo__v">'+pesos(pendiente)+'</b>'+
-      '<span class="rec-saldo__p">'+
+      '<span class="rec-saldo__p'+(pendiente && !cuentaBanco(f) ? ' es-falta' : '')+'">'+
         (pendiente
-          ? 'Se acredita el '+prox.getDate()+'/'+("0"+(prox.getMonth()+1)).slice(-2)+'/'+prox.getFullYear()
+          ? (cuentaBanco(f)
+              ? 'Se acredita el '+prox.getDate()+'/'+("0"+(prox.getMonth()+1)).slice(-2)+'/'+prox.getFullYear()
+              : 'Sin cuenta de destino: no se puede girar')
           : 'No hay fondos en tránsito')+
       '</span>'+
       '<div class="rec-saldo__tot">'+
         '<div><span>Total recibido</span><b>'+pesos(total)+'</b></div>'+
         '<div><span>Apoyos mensuales</span><b>'+pesos(porMes)+'</b></div>'+
       '</div>'+
+
+      // A dónde va la plata. Sin cuenta cargada no hay giro posible, así que
+      // esa falta se ve en el mismo bloque que promete la fecha.
+      (function(){
+        var cta = cuentaBancoBonita(f);
+        var ult = DB.transferencias.filter(function(t){ return t.fid === f.id; })
+          .sort(function(a,b){ return a.cuando < b.cuando ? 1 : -1; })[0];
+        var fUlt = ult ? new Date(ult.cuando) : null;
+        return '<div class="rec-cuenta">'+
+            '<span class="rec-cuenta__t">'+
+              '<span class="rec-cuenta__r">Cuenta de destino</span>'+
+              (cta ? '<b class="rec-cuenta__v">'+esc(cta)+'</b>'
+                   : '<b class="rec-cuenta__v es-falta">Sin cuenta cargada</b>')+
+            '</span>'+
+            '<button class="btn btn--ghost btn--xs" id="btnCuentaBanco">'+
+              (cta ? 'Cambiar' : 'Cargar CBU')+'</button>'+
+          '</div>'+
+          (pendiente && cta
+            ? '<button class="btn btn--ghost btn--block" id="btnTransferRecibida">'+
+                'Marcar transferencia como recibida</button>'
+            : '')+
+          (pendiente && !cta
+            ? '<span class="rec-saldo__ult es-falta">Cargá el CBU para que el saldo se pueda acreditar.</span>'
+            : '')+
+          (!pendiente && ult
+            ? '<span class="rec-saldo__ult">Última transferencia recibida: '+pesos(ult.monto)+
+              ' el '+("0"+fUlt.getDate()).slice(-2)+"/"+("0"+(fUlt.getMonth()+1)).slice(-2)+'</span>'
+            : '');
+      })()+
     '</div>'+
 
     '<div class="solapas">'+
@@ -10722,6 +10875,9 @@ document.addEventListener("click", function(e){
     }
     return;
   }
+
+  if(e.target.closest("#btnCuentaBanco")) return modalCuentaBancaria();
+  if(e.target.closest("#btnTransferRecibida")) return modalTransferenciaRecibida();
 
   // El comprobante del extracto: el mismo archivo que ve la fundación, para
   // adjuntar a su contabilidad.
