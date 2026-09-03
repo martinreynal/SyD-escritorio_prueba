@@ -3014,6 +3014,20 @@ body.perfil-quieto .panels,body.perfil-quieto .panel{
   .intro.se-va{animation:none}
 }
 
+/* ==================== PERFIL: QUE SE PUEDA DESPLAZAR ====================
+   El perfil se congelaba con overflow:hidden sobre el body, heredado del modo
+   aplicación: en un teléfono el contenido entra justo y no hay nada que
+   desplazar. Pero #screen-app declara height:100dvh sin !important y
+   .screen{height:auto !important} le gana, así que la pantalla crece con su
+   contenido (939px) mientras el body sigue midiendo lo que la ventana. Todo lo
+   que pasaba de ahí quedaba recortado y fuera de alcance: en una ventana de
+   700px de alto, "Cerrar sesión" no se podía ni ver ni tocar.
+
+   Con overflow-y:auto el body pasa a ser el que desplaza. Cuando el contenido
+   entra —que es el caso del teléfono— no aparece ninguna barra y no cambia
+   nada; cuando no entra, se llega al final. */
+body.perfil-quieto{overflow-y:auto !important}
+
 /* ==================== FICHA DE DATOS ====================
    Filas de etiqueta y valor para los modales que sólo informan. Cada dato en su
    renglón, con el valor alineado a la derecha: así se leen en vertical y se
@@ -3272,10 +3286,6 @@ body.perfil-quieto .panels,body.perfil-quieto .panel{
   .suenos-lista > .sueno{flex:0 0 320px}
   .subastas-grid > .lote{flex:0 0 360px}
   #screen-fundaciones .carrusel__slide{flex:0 0 400px}
-  /* Eventos y fundaciones traen su propio ancho escrito con el id de la
-     pantalla, que le gana a la clase suelta de arriba: hay que repetirlas con
-     la misma especificidad o siguen ocupando el 92% del carril. */
-  #screen-eventos .carrusel__slide{flex:0 0 360px;flex-basis:360px}
 
   /* Sin tarjeta "apagada": si se ven todas, atenuar las de los costados sólo
      ensucia. La activa se sigue marcando, pero con el contorno. */
@@ -3360,13 +3370,44 @@ body.perfil-quieto .panels,body.perfil-quieto .panel{
   #screen-deseos .stats-pantalla:has(.esperando) > *,
   #screen-subastas .stats-pantalla:has(.esperando) > *{flex:0 0 auto}
 
-  /* ---- 3c. el carril de eventos se centra en el alto disponible ----
-     La tarjeta se mide por su contenido, así que en una pantalla alta quedaba
-     arriba con medio pantallazo vacío abajo. Estirarla no sirve: la foto es un
-     fondo con background-size:contain y al agrandar la caja sólo crecen las
-     bandas grises de arriba y abajo. Lo que se centra es el carril entero, que
-     reparte el aire sobrante entre las dos puntas. */
-  #screen-eventos .carrusel__viewport{display:flex;align-items:center}
+  /* ---- 3c. eventos: grilla, no carrusel ----
+     En el teléfono los eventos van de a uno y se pasan con el dedo. En
+     escritorio ese gesto no existe y un carril horizontal obliga a empujar
+     tarjetas para ver lo que ya cabría en pantalla: con cuatro actividades
+     siempre quedaba una cortada al borde.
+
+     Acá se muestran todas en una grilla que se acomoda al ancho (tres columnas
+     en 1440, dos en pantallas más justas). El carril sigue existiendo por
+     debajo, sólo que sin nada que desplazar: el motor del carrusel escribe
+     scrollLeft sobre una caja que ya no desborda, y no pasa nada.
+
+     La caja pasa a desplazarse en vertical, que es lo que hace falta cuando la
+     grilla ocupa más de una fila. */
+  #screen-eventos .stats-pantalla{overflow-y:auto}
+  /* El !important no es capricho: crearCarrusel() escribe display:flex en línea
+     y acomodarPlaca() le pone un alto en píxeles, y un estilo en línea le gana a
+     cualquier regla salvo a un !important. */
+  #screen-eventos .carrusel{
+    display:block !important;
+    height:auto !important;
+    flex:none;
+    min-height:0}
+  #screen-eventos .carrusel__flecha{display:none}
+  #screen-eventos .carrusel__viewport{
+    overflow:visible;
+    height:auto !important}
+  #screen-eventos .carrusel__track{
+    display:grid;
+    grid-template-columns:repeat(auto-fill, minmax(330px, 1fr));
+    gap:18px;
+    width:auto;
+    transform:none !important}
+  #screen-eventos .carrusel__slide{
+    flex:none;
+    width:auto;
+    max-width:none;
+    padding:0;
+    margin:0}
 
   /* ---- 3d. el listado de novedades se lee en columna, no en franja ----
      A todo lo ancho, el texto queda a la izquierda y la hora al otro extremo:
@@ -10315,6 +10356,11 @@ document.addEventListener("click", function(e){
     if(caja) caja.classList.toggle("is-open");
     return;
   }
+  // Los siete botones de volver de las cabeceras. El atributo se escribe sin
+  // valor (data-volver-inicio, no data-volver-inicio="algo"), y por eso una
+  // limpieza anterior lo dio por muerto y se llevó esta línea: buscaba el
+  // atributo seguido de "=". Sin ella, ninguna cabecera volvía a ningún lado.
+  if(e.target.closest("[data-volver-inicio]")) return volverHome();
   if(e.target.closest("#btnVolverLista")) return cerrarFundacion();
   // Dentro de la tarjeta hay etiquetas que llevan a la fundación: tienen prioridad.
   if((t = e.target.closest("[data-editar]"))){
