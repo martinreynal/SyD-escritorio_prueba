@@ -3401,6 +3401,91 @@ body.perfil-quieto{overflow-y:auto !important}
 .intro__saltar:hover{color:#fff;background:rgba(255,255,255,.06)}
 .intro__saltar:active{color:#fff}
 
+/* ==================== CONOCÉ LAS FUNDACIONES ====================
+   Cabecera, filtros, contador y las dos formas de ver: grilla de a tres en
+   escritorio y de a una, a lo ancho. En el teléfono siempre va una por fila. */
+#screen-fundaciones .lede{display:none}
+#screen-fundaciones .carrusel{display:none !important}
+.fx-cab{margin:0 0 14px}
+.fx-tit{margin:0;font-size:clamp(26px,4.4vw,40px);font-weight:800;letter-spacing:-.02em;color:#fff}
+.fx-sub{margin:6px 0 0;font-size:clamp(14px,2.6vw,17px);color:rgba(226,240,255,.8)}
+.fx-cab__d{margin:10px 0 0;font-size:13.5px;line-height:1.5;color:rgba(159,196,216,.75)}
+
+.fx-filtros{display:flex;gap:8px;margin-top:10px;overflow-x:auto;scrollbar-width:none}
+.fx-filtros::-webkit-scrollbar{display:none}
+.fx-chip{flex:none;display:inline-flex;align-items:center;gap:8px;padding:10px 16px;border-radius:12px;
+  cursor:pointer;font-family:inherit;font-size:13.5px;font-weight:600;
+  color:rgba(226,240,255,.82);border:1px solid var(--canto);background:var(--vidrio)}
+.fx-chip svg{width:16px;height:16px}
+.fx-chip.is-on{color:#06202a;border-color:transparent;background:linear-gradient(90deg,#22d3ee,#5eead4)}
+.fx-chip--sel{padding:0;position:relative}
+.fx-chip--sel select{appearance:none;-webkit-appearance:none;border:0;background:none;cursor:pointer;
+  padding:10px 34px 10px 16px;font-family:inherit;font-size:13.5px;font-weight:600;color:inherit}
+.fx-chip--sel select option{background:#0b1a2c;color:#fff}
+.fx-chip--sel::after{content:"";position:absolute;right:14px;top:50%;margin-top:-3px;width:7px;height:7px;
+  border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(45deg);pointer-events:none}
+
+.fx-barra{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:14px 0 10px}
+.fx-cuenta{font-size:14px;font-weight:600;color:rgba(226,240,255,.85)}
+.fx-vistas{display:flex;gap:6px;padding:4px;border-radius:12px;border:1px solid var(--canto);background:var(--vidrio)}
+.fx-vista{display:grid;place-items:center;width:34px;height:30px;border:0;border-radius:8px;cursor:pointer;
+  background:none;color:rgba(226,240,255,.6)}
+.fx-vista svg{width:18px;height:18px}
+.fx-vista.is-on{color:#06202a;background:linear-gradient(90deg,#22d3ee,#5eead4)}
+
+.fx-lista{display:grid;gap:16px}
+.fx-card{display:flex;flex-direction:column;overflow:hidden;cursor:pointer;text-align:left;
+  border-radius:18px;border:1px solid var(--canto);background:var(--vidrio)}
+.fx-card__foto{position:relative;height:150px;flex:none;overflow:hidden;
+  background:radial-gradient(120% 120% at 25% 15%, color-mix(in srgb, var(--tono-f,#22d3ee) 45%, transparent), #0b1a2c 70%)}
+/* No hay fotos de portada: el logo, muy ampliado y desenfocado, hace de fondo. */
+.fx-card__fondo{position:absolute;inset:-25%;background:center/cover no-repeat;
+  filter:blur(26px) saturate(1.3);opacity:.75;transform:scale(1.1)}
+.fx-card__fondo[data-real]{inset:0;filter:none;opacity:1;transform:none}
+.fx-card__foto::after{content:"";position:absolute;inset:0;
+  background:linear-gradient(180deg,rgba(5,12,23,.3),rgba(5,12,23,.88))}
+.fx-sello,.fx-web,.fx-fav{position:absolute;z-index:1}
+.fx-sello{top:12px;left:12px;display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;
+  font-size:12.5px;font-weight:600;color:#bbf7d0;background:rgba(6,40,26,.8);border:1px solid rgba(74,222,128,.45)}
+.fx-sello svg{width:13px;height:13px;color:#4ade80}
+.fx-sello.es-apoyo{color:#fecaca;background:rgba(60,12,12,.8);border-color:rgba(248,113,113,.5)}
+.fx-sello.es-apoyo svg{color:#f87171}
+.fx-web{top:12px;right:12px;padding:7px 14px;border-radius:10px;cursor:pointer;font-family:inherit;
+  font-size:12.5px;font-weight:600;color:#fff;border:1px solid rgba(255,255,255,.28);
+  background:rgba(8,20,36,.7);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.fx-fav{top:12px;right:12px;display:grid;place-items:center;width:34px;height:34px;border-radius:50%;
+  cursor:pointer;color:#fff;border:1px solid rgba(255,255,255,.25);background:rgba(8,20,36,.6)}
+.fx-fav svg{width:17px;height:17px}
+.fx-fav.is-on{color:#fb7185;border-color:rgba(251,113,133,.5)}
+.fx-fav.is-on svg{fill:currentColor}
+.fx-web + .fx-fav{right:auto;left:12px;top:auto;bottom:12px}
+.fx-card__c{position:relative;flex:1;display:flex;flex-direction:column;padding:0 18px 18px}
+.fx-card__id{display:flex;align-items:center;gap:12px;margin-top:-30px}
+.fx-card__id .avatar{width:60px;height:60px;border:3px solid #0b1a2c;box-shadow:0 6px 18px rgba(0,0,0,.45)}
+.fx-cat{padding:6px 13px;border-radius:999px;font-size:12.5px;font-weight:600;color:#fff;
+  background:rgba(8,20,36,.85);border:1px solid var(--canto)}
+.fx-card__n{margin:12px 0 0;font-size:19px;font-weight:700;color:#fff}
+.fx-card__l{margin:5px 0 0;font-size:14.5px;color:rgba(226,240,255,.8)}
+.fx-card__d{display:flex;align-items:center;gap:7px;margin:9px 0 0;font-size:13px;color:rgba(159,196,216,.78)}
+.fx-card__d svg{width:15px;height:15px;flex:none}
+.fx-card__d{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fx-card__d i{font-style:normal;margin:0 3px;opacity:.5}
+.fx-card__q{margin:7px 0 0;font-size:13px;color:rgba(159,196,216,.75)}
+.fx-card__t{margin:11px 0 0;font-size:13.5px;line-height:1.5;color:rgba(226,240,255,.72)}
+.fx-card__rec{margin-top:auto;padding:12px 14px;border-radius:12px;
+  border:1px solid var(--canto);background:rgba(255,255,255,.03)}
+.fx-card__rec b{display:block;font-size:20px;font-weight:700;color:#fff;font-variant-numeric:tabular-nums}
+.fx-card__rec span{display:block;margin-top:2px;font-size:12.5px;color:rgba(159,196,216,.75)}
+.fx-card__pie{display:flex;gap:10px;margin-top:12px}
+.fx-b{flex:1;padding:12px 14px;border-radius:11px;cursor:pointer;font-family:inherit;
+  font-size:14px;font-weight:700;color:var(--turq);
+  border:1px solid rgba(45,212,191,.45);background:transparent}
+.fx-b--don{color:#06202a;border-color:transparent;
+  background:linear-gradient(90deg,#22d3ee,#34e0c8 60%,#4ade80)}
+.fx-b--don i{font-style:normal;margin-left:6px}
+/* espacio bajo el último renglón para que la barra no tape las acciones */
+#screen-fundaciones .fx-lista{padding-bottom:calc(var(--nav-alto) + 16px)}
+
 /* ==================== OTRAS FORMAS DE AYUDAR ====================
    Los tres pasos arriba, las cinco formas como tarjetas con ícono y el botón
    que nombra la elección. Vale en cualquier ancho; en escritorio van dos por
@@ -4242,6 +4327,22 @@ body:not(.es-fundacion) #screen-avisos .aviso__cta{margin-top:8px}
   .ap2-act > .ap2-tarj{flex:1;min-width:0}
   .ap2-tarj__c em{font-size:34px}
 
+  /* Fundaciones: de a tres por fila, o de a una a lo ancho. */
+  #screen-fundaciones .stats-pantalla{max-width:1240px}
+  .fx-cab{display:flex;align-items:flex-start;gap:34px;margin-bottom:18px}
+  .fx-cab__t{flex:1;min-width:0}
+  .fx-cab__d{flex:none;max-width:330px;margin:6px 0 0;padding-left:26px;
+    border-left:1px solid var(--canto)}
+  .fx-lista{grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}
+  .fx-lista.es-una{grid-template-columns:minmax(0,1fr);gap:16px}
+  /* De a una: la portada pasa al costado, como una ficha ancha. */
+  .fx-lista.es-una .fx-card{flex-direction:row;align-items:stretch}
+  .fx-lista.es-una .fx-card__foto{width:38%;height:auto;min-height:230px}
+  .fx-lista.es-una .fx-card__c{flex:1;padding:18px 22px}
+  .fx-lista.es-una .fx-card__id{margin-top:0}
+  .fx-lista.es-una .fx-card__pie{max-width:420px}
+  .fx-card__foto{height:170px}
+
   /* Otras formas de ayudar: dos por fila y la quinta centrada, como el plano. */
   #screen-aporte .ap3-ops{grid-template-columns:1fr 1fr;gap:16px}
   #screen-aporte .ap3-op{padding:20px 48px 20px 20px !important}
@@ -4680,6 +4781,14 @@ body:not(.es-fundacion) #screen-avisos .aviso__cta{margin-top:8px}
     <button class="volver-ico" data-volver-inicio aria-label="Volver"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
   </header>
   <div class="stats-pantalla">
+    <div class="fx-cab">
+      <div class="fx-cab__t">
+        <h1 class="fx-tit">Conocé las fundaciones</h1>
+        <p class="fx-sub">Organizaciones reales. Historias que generan un cambio.</p>
+      </div>
+      <p class="fx-cab__d">Explorá las fundaciones que forman parte de Soñá y Doná.
+        Conocé su misión, sus proyectos y cómo podés ayudarlas.</p>
+    </div>
     <p class="lede">Las que forman parte de Cumplí tu Deseo. Tocá una para ver su perfil completo.</p>
     <div class="buscador-wrap">
       <div class="buscador">
@@ -4692,7 +4801,30 @@ body:not(.es-fundacion) #screen-avisos .aviso__cta{margin-top:8px}
         <button class="buscador__limpiar" id="buscadorLimpiar" aria-label="Limpiar búsqueda" hidden>&times;</button>
       </div>
       <div class="sugerencias" id="sugerencias" role="listbox" hidden></div>
+      <div class="fx-filtros">
+        <button class="fx-chip is-on" data-ffiltro="todas">Todas</button>
+        <label class="fx-chip fx-chip--sel">
+          <select id="fxLugar" aria-label="Filtrar por ubicación"></select>
+        </label>
+        <button class="fx-chip fx-chip--fav" data-ffiltro="favoritas">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+               stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 20.4s-7.3-4.6-7.3-9.6a4.2 4.2 0 0 1 7.3-2.7 4.2 4.2 0 0 1 7.3 2.7c0 5-7.3 9.6-7.3 9.6z"/>
+          </svg>Mis favoritas</button>
+      </div>
     </div>
+    <div class="fx-barra">
+      <span class="fx-cuenta" id="fxCuenta"></span>
+      <div class="fx-vistas" role="group" aria-label="Forma de ver">
+        <button class="fx-vista is-on" data-fvista="grilla" aria-label="Ver en filas de tres">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="3.5" y="3.5" width="7.5" height="7.5" rx="1.6"/><rect x="13" y="3.5" width="7.5" height="7.5" rx="1.6"/><rect x="3.5" y="13" width="7.5" height="7.5" rx="1.6"/><rect x="13" y="13" width="7.5" height="7.5" rx="1.6"/></svg>
+        </button>
+        <button class="fx-vista" data-fvista="una" aria-label="Ver de a una">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><path d="M4 6.5h16M4 12h16M4 17.5h16"/></svg>
+        </button>
+      </div>
+    </div>
+    <div class="fx-lista" id="fxLista"></div>
     <div class="carrusel" id="carrusel">
       <button class="carrusel__flecha carrusel__flecha--izq" id="carruselPrev" aria-label="Fundación anterior">&#8249;</button>
       <div class="carrusel__viewport">
@@ -6474,12 +6606,113 @@ var carFund = crearCarrusel({
   render:function(f){ return tarjetaFundacion(f); }
 });
 
-function pintarFundaciones(){
-  carFund.pintar(DB.fundaciones);
-  // Las tarjetas cambian de alto según lo que muestren: se vuelven a medir.
-  requestAnimationFrame(function(){ acomodarPlaca("screen-fundaciones"); montarCarriles(); });
+// Estado de la pantalla de fundaciones: qué se buscó, qué ubicación se eligió,
+// si se ven sólo las favoritas y en qué forma se muestran.
+var fxEstado = {q:"", lugar:"", solofav:false, vista:"grilla"};
+var FAVORITAS = [];
+
+function esFavorita(fid){ return FAVORITAS.indexOf(fid) > -1; }
+function alternarFavorita(fid){
+  var i = FAVORITAS.indexOf(fid);
+  if(i > -1) FAVORITAS.splice(i, 1); else FAVORITAS.push(fid);
 }
-function actualizarCarrusel(animar){ carFund.ubicar(animar); }
+
+// El buscador filtra la grilla además de sugerir: se cruza nombre, ubicación,
+// causa y lema, igual que las sugerencias de acceso rápido.
+function fundacionesFiltradas(){
+  var q = (fxEstado.q||"").trim().toLowerCase();
+  return DB.fundaciones.filter(function(f){
+    if(fxEstado.solofav && !esFavorita(f.id)) return false;
+    if(fxEstado.lugar && f.lugar !== fxEstado.lugar) return false;
+    if(!q) return true;
+    return f.nombre.toLowerCase().indexOf(q) > -1 ||
+           (f.lugar||"").toLowerCase().indexOf(q) > -1 ||
+           (f.lema||"").toLowerCase().indexOf(q) > -1 ||
+           (f.causas||[]).some(function(c){ return c.t.toLowerCase().indexOf(q) > -1; });
+  });
+}
+
+function opcionesLugar(){
+  var sel = document.getElementById("fxLugar"); if(!sel) return;
+  var lugares = [];
+  DB.fundaciones.forEach(function(f){ if(f.lugar && lugares.indexOf(f.lugar) < 0) lugares.push(f.lugar); });
+  lugares.sort();
+  sel.innerHTML = '<option value="">Ubicación</option>'+
+    lugares.map(function(l){ return '<option value="'+esc(l)+'">'+esc(l)+'</option>'; }).join("");
+  sel.value = fxEstado.lugar;
+}
+
+// Tarjeta del plano: portada, sellos, avatar montado, nombre, lema, dónde y
+// desde cuándo, qué hace, lo recaudado y las dos acciones.
+function tarjetaFundacion(f){
+  var recaudado = DB.donaciones.filter(function(d){ return d.fid === f.id; })
+    .reduce(function(n,d){ return n + d.monto; }, 0);
+  var texto = (f.texto||"").split("\n")[0];
+  if(texto.length > 150) texto = texto.slice(0,148).replace(/\s+\S*$/,"")+"…";
+  return '<article class="fx-card" data-fundacion="'+f.id+'" tabindex="0" role="button" '+
+    'aria-label="Ver '+esc(f.nombre)+'">'+
+    '<div class="fx-card__foto"'+(f.color ? ' style="--tono-f:'+esc(f.color)+'"' : '')+'>'+
+      (f.banner || f.foto
+        ? '<span class="fx-card__fondo" style="background-image:url('+(f.banner||f.foto)+')"'+
+          (f.banner ? ' data-real="1"' : '')+'></span>'
+        : '')+
+      '<span class="fx-sello'+(f.verificada ? '' : ' es-apoyo')+'">'+
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" '+
+        'stroke-linecap="round" stroke-linejoin="round"><path d="M6 12.4l4 4 8-8.4"/></svg>'+
+        (f.verificada ? 'Verificada' : 'Necesita tu apoyo')+'</span>'+
+      (f.web
+        ? '<button class="fx-web" data-web="'+esc(f.web)+'">Sitio web</button>'
+        : '')+
+      '<button class="fx-fav'+(esFavorita(f.id)?' is-on':'')+'" data-fav="'+f.id+'" '+
+        'aria-label="Guardar en mis favoritas">'+
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" '+
+        'stroke-linecap="round" stroke-linejoin="round">'+
+        '<path d="M12 20.4s-7.3-4.6-7.3-9.6a4.2 4.2 0 0 1 7.3-2.7 4.2 4.2 0 0 1 7.3 2.7c0 5-7.3 9.6-7.3 9.6z"/>'+
+        '</svg></button>'+
+    '</div>'+
+    '<div class="fx-card__c">'+
+      '<div class="fx-card__id">'+
+        '<span class="avatar" style="'+avatarCSS(f)+'">'+(f.foto?"":esc(iniciales(f.nombre)))+'</span>'+
+        (f.aQuien && f.aQuien.length <= 26 ? '<span class="fx-cat">'+esc(f.aQuien)+'</span>' : '')+
+      '</div>'+
+      '<h3 class="fx-card__n">'+esc(f.nombre)+'</h3>'+
+      '<p class="fx-card__l">'+esc(f.lema||"")+'</p>'+
+      (f.aQuien && f.aQuien.length > 26 ? '<p class="fx-card__q">'+esc(f.aQuien)+'</p>' : '')+
+      '<p class="fx-card__d">'+
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" '+
+        'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+
+        '<path d="M12 21s6.4-5.6 6.4-10.2A6.4 6.4 0 0 0 5.6 10.8C5.6 15.4 12 21 12 21z"/>'+
+        '<circle cx="12" cy="10.6" r="2.4"/></svg>'+
+        esc(f.lugar||"")+(f.desde ? '<i>|</i>Desde '+f.desde : '')+'</p>'+
+      (texto ? '<p class="fx-card__t">'+esc(texto)+'</p>' : '')+
+      '<div class="fx-card__rec"><b>'+pesos(recaudado)+'</b><span>recaudado en total</span></div>'+
+      '<div class="fx-card__pie">'+
+        '<button class="fx-b" data-fundacion="'+f.id+'">Ver perfil</button>'+
+        (puedeAportar()
+          ? '<button class="fx-b fx-b--don" data-donar="'+f.id+'">Donar ahora <i>&#8594;</i></button>'
+          : '')+
+      '</div>'+
+    '</div></article>';
+}
+
+function pintarFundaciones(){
+  var caja = document.getElementById("fxLista"); if(!caja) return;
+  opcionesLugar();
+  var lista = fundacionesFiltradas();
+  var cuenta = document.getElementById("fxCuenta");
+  if(cuenta) cuenta.textContent = lista.length + (lista.length===1 ? " fundación" : " fundaciones");
+  caja.className = "fx-lista" + (fxEstado.vista === "una" ? " es-una" : "");
+  caja.innerHTML = lista.length
+    ? lista.map(tarjetaFundacion).join("")
+    : '<div class="empty">No encontramos fundaciones con esa búsqueda.</div>';
+  $$("[data-ffiltro]").forEach(function(b){
+    b.classList.toggle("is-on", (b.dataset.ffiltro === "favoritas") === fxEstado.solofav);
+  });
+  $$("[data-fvista]").forEach(function(b){
+    b.classList.toggle("is-on", b.dataset.fvista === fxEstado.vista);
+  });
+}
+function actualizarCarrusel(animar){ /* la pantalla de fundaciones ya no usa carrusel */ }
 
 /* ---- buscador con anticipación ---- */
 function marcarCoincidencia(texto, q){
@@ -6510,6 +6743,8 @@ function buscarFundaciones(q){
 var sugMarcada = -1;
 function pintarSugerencias(){
   var q = $("#buscador").value;
+  fxEstado.q = q;
+  if(document.getElementById("fxLista")) pintarFundaciones();
   var caja = $("#sugerencias"), limpiar = $("#buscadorLimpiar");
   limpiar.hidden = !q.trim();
   if(!q.trim()){
@@ -8588,6 +8823,11 @@ function abrirSubastas(){
   document.body.classList.add("sin-scroll");
 }
 function abrirFundaciones(){
+  var sel = document.getElementById("fxLugar");
+  if(sel && !sel.dataset.listo){
+    sel.dataset.listo = "1";
+    sel.addEventListener("change", function(){ fxEstado.lugar = sel.value; pintarFundaciones(); });
+  }
   abrirPantalla("screen-fundaciones", function(){
     if(carFund) carFund.revisar();
     // Se mide como las demás para que la tarjeta no quede bajo el menú.
@@ -11792,6 +12032,21 @@ document.addEventListener("click", function(e){
     var f = miFundacion(); if(!f) return;
     f.eventos = f.eventos.filter(function(x){ return x.id !== t.dataset.borrarEv; });
     pintarTodo(); toast("Evento quitado.");
+    return;
+  }
+  if((t = e.target.closest("[data-fav]"))){
+    alternarFavorita(t.dataset.fav);
+    pintarFundaciones();
+    return;
+  }
+  if((t = e.target.closest("[data-ffiltro]"))){
+    fxEstado.solofav = t.dataset.ffiltro === "favoritas";
+    pintarFundaciones();
+    return;
+  }
+  if((t = e.target.closest("[data-fvista]"))){
+    fxEstado.vista = t.dataset.fvista;
+    pintarFundaciones();
     return;
   }
   if((t = e.target.closest("[data-ir-fundacion]"))) return abrirFundacion(t.dataset.irFundacion);
