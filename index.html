@@ -3401,6 +3401,19 @@ body.perfil-quieto{overflow-y:auto !important}
 .intro__saltar:hover{color:#fff;background:rgba(255,255,255,.06)}
 .intro__saltar:active{color:#fff}
 
+/* ---- Desplazamiento con la rueda, sin barras a la vista ----
+   Los paneles que se desplazan por dentro mostraban su propia barra vertical.
+   Se sigue pudiendo bajar con la rueda o el dedo; sólo deja de dibujarse. */
+#screen-apoyo .stats-pantalla,#screen-avisos .stats-pantalla,
+#screen-eventos .stats-pantalla,#screen-deseos .stats-pantalla,
+#screen-subastas .stats-pantalla,#screen-fundaciones .stats-pantalla,
+#listaAvisos,#vistaDetalle,.viewport,.panel{scrollbar-width:none;-ms-overflow-style:none}
+#screen-apoyo .stats-pantalla::-webkit-scrollbar,#screen-avisos .stats-pantalla::-webkit-scrollbar,
+#screen-eventos .stats-pantalla::-webkit-scrollbar,#screen-deseos .stats-pantalla::-webkit-scrollbar,
+#screen-subastas .stats-pantalla::-webkit-scrollbar,#screen-fundaciones .stats-pantalla::-webkit-scrollbar,
+#listaAvisos::-webkit-scrollbar,#vistaDetalle::-webkit-scrollbar,
+.viewport::-webkit-scrollbar,.panel::-webkit-scrollbar{width:0;height:0;display:none}
+
 /* ---- Fondo fotográfico y relleno del héroe (todos los anchos) ----
    Antes vivían en la capa de escritorio y por eso no se veían en el teléfono
    ni en la vista previa angosta. La composición grande sigue siendo de
@@ -4047,6 +4060,17 @@ body:not(.es-fundacion) #screen-avisos .aviso__cta{margin-top:8px}
   body:not(.es-fundacion) #screen-avisos .aviso__cta::after{content:"\2192";margin-left:10px}
   body:not(.es-fundacion) #screen-avisos .avisos__fin{margin:22px 0 8px}
   body:not(.es-fundacion) #screen-avisos .avisos__vacio{margin:26px 0;text-align:center}
+
+  /* La bandeja arranca arriba también cuando el filtro deja pocas fichas: el
+     centrado vertical hacía "caer" el título al cambiar de categoría. */
+  body:not(.es-fundacion) #screen-avisos .stats-pantalla{justify-content:flex-start !important}
+
+  /* El perfil público de una fundación ocupa la pantalla entera: se suelta el
+     desplazamiento (el panel de la lista lo tenía trabado) y se retira la
+     barra inferior, que no corresponde acá. */
+  body.perfil-fund .nav5{display:none !important}
+  body.perfil-fund #vistaDetalle{height:calc(100dvh - 66px);overflow-y:auto;overscroll-behavior:contain}
+  body.perfil-fund .panel,body.perfil-fund .viewport{overflow:visible}
 
   /* ---- Presentación en escritorio ---- */
   /* Acto 2 en dos columnas: a la izquierda la promesa, a la derecha los cinco
@@ -7824,6 +7848,9 @@ function abrirFundacion(fid, ancla){
   $("#screen-app").classList.add("is-active");
   DB.vistas.fund[fid] = (DB.vistas.fund[fid]||0) + 1;
   fundacionAbierta = fid;
+  // El perfil ocupa toda la pantalla: el body lo señala para poder soltar el
+  // desplazamiento y esconder la barra inferior en escritorio.
+  document.body.classList.add("perfil-fund");
   $("#vistaLista").style.display = "none";
   $("#vistaDetalle").style.display = "block";
   pintarFundacionAbierta();
@@ -7839,6 +7866,7 @@ function abrirFundacion(fid, ancla){
 }
 function cerrarFundacion(){
   fundacionAbierta = null;
+  document.body.classList.remove("perfil-fund");
   $("#vistaDetalle").style.display = "none";
   $("#vistaDetalle").innerHTML = "";
   $("#vistaLista").style.display = "block";
@@ -8356,6 +8384,7 @@ function marcarTab(cual){
 }
 
 function abrirPantalla(id, despues){
+  document.body.classList.remove("perfil-fund");
   apagarNoche();
   marcarTab("");
   document.body.classList.remove("portada");
@@ -11026,6 +11055,7 @@ window.addEventListener("resize", acomodarFirmaPortada);
 window.addEventListener("load", acomodarFirmaPortada);
 
 function volverHome(){
+  document.body.classList.remove("perfil-fund");
   marcarTab("inicio");
   // Una fundación no tiene menú de donante: vuelve a su propio panel.
   if(sesion && esFundacion()){
