@@ -3401,7 +3401,24 @@ body.perfil-quieto{overflow-y:auto !important}
 .intro__saltar:hover{color:#fff;background:rgba(255,255,255,.06)}
 .intro__saltar:active{color:#fff}
 
+/* ==================== MENÚ PRINCIPAL SIN ÍCONOS ====================
+   Las cinco entradas se apoyan en el texto: el disco con ilustración sale de
+   las tarjetas. Los íconos de la barra inferior no se tocan. */
+.menu-principal .entrada__ico{display:none !important}
+.solo-mov{display:inline}
+.entrada__t b{font-weight:inherit;color:var(--turq)}
+.dato__pie{display:block;margin-top:6px;font-size:13px;color:rgba(159,196,216,.7)}
+
 /* ==================== CONOCÉ LAS FUNDACIONES ====================
+/* El listado se recorre como una página: sin barra inferior y sin el alto
+   trabado que usa el resto de la app. */
+body.es-listado .nav5{display:none !important}
+body.es-listado{overflow:auto !important;position:static !important;height:auto !important}
+body.es-listado #screen-fundaciones{height:auto;min-height:100dvh}
+body.es-listado #screen-fundaciones .stats-pantalla{position:static !important;height:auto !important;
+  overflow:visible !important;padding-bottom:32px}
+body.es-listado #screen-fundaciones .fx-lista{padding-bottom:24px}
+
    Cabecera, filtros, contador y las dos formas de ver: grilla de a tres en
    escritorio y de a una, a lo ancho. En el teléfono siempre va una por fila. */
 #screen-fundaciones .lede{display:none}
@@ -4155,7 +4172,11 @@ body:not(.es-fundacion) #screen-avisos .aviso__cta{margin-top:8px}
   body:not(.es-fundacion):not(.es-admin){--nav-alto:calc(var(--nav-fila) + 18px)}
   body.menu-fijo .menu-principal{grid-template-rows:repeat(2, minmax(0, 330px));gap:clamp(12px,2.2vh,20px)}
   body.menu-fijo .menu-principal .entrada{padding:clamp(16px,2.8vh,26px) 28px;justify-content:flex-start;gap:0}
-  body.menu-fijo .menu-principal .entrada .entrada__col{justify-content:flex-start;margin-top:clamp(8px,2.4vh,22px)}
+  body.menu-fijo .menu-principal .entrada .entrada__col{justify-content:flex-start;margin-top:0}
+  body.menu-fijo .menu-principal .solo-mov{display:none}
+  /* Sin el disco arriba, el contenido de la tarjeta arranca en el borde. */
+  body.menu-fijo .menu-principal .entrada{padding:clamp(20px,3.2vh,30px) 28px}
+  body.menu-fijo .menu-principal .es-principal .entrada__col{margin-top:0}
   body.menu-fijo .menu-principal .entrada .entrada__ico{width:clamp(44px,6vh,56px);height:clamp(44px,6vh,56px)}
 
   body.menu-fijo .menu-principal .entrada .entrada__t{font-size:clamp(18px,2.6vh,22px);line-height:1.2;font-weight:600}
@@ -4172,8 +4193,8 @@ body:not(.es-fundacion) #screen-avisos .aviso__cta{margin-top:8px}
   body.menu-fijo .menu-principal .es-principal .entrada__bajada{
     display:block !important;margin-top:clamp(10px,2.2vh,20px);font-size:clamp(16px,2.2vh,19px);line-height:1.45;color:rgba(255,255,255,.72)}
   body.menu-fijo .menu-principal .es-principal .entrada__cta{
-    display:inline-flex !important;align-items:center;gap:14px;align-self:flex-start;margin-top:clamp(16px,3.2vh,30px);
-    padding:clamp(13px,1.9vh,17px) 30px;border-radius:14px;font-size:17px;font-weight:600;color:#06202a;
+    display:inline-flex !important;align-items:center;gap:22px;align-self:flex-start;margin-top:clamp(16px,3.2vh,30px);
+    padding:clamp(14px,2vh,18px) 34px;border-radius:999px;border-radius:14px;font-size:17px;font-weight:600;color:#06202a;
     background:linear-gradient(90deg,#22b8cf,#2dd4bf 70%,#34d399);
     box-shadow:0 10px 30px rgba(45,212,191,.28)}
   body.menu-fijo .menu-principal .es-principal .entrada__cta i{font-style:normal;font-size:24px;line-height:1;transform:translateY(-1px)}
@@ -4420,7 +4441,7 @@ body:not(.es-fundacion) #screen-avisos .aviso__cta{margin-top:8px}
         <span class="entrada__ico entrada__ico--arte" aria-hidden="true"><svg viewBox="0 0 32 32" fill="none" aria-hidden="true"><path d="M20.4 4.2l1.55 4.3 4.3 1.55-4.3 1.55-1.55 4.3-1.55-4.3-4.3-1.55 4.3-1.55z" fill="currentColor" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M14.6 15.6L5.2 26.4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M17.2 20.6l-4.2 4.6M10.4 17.4l-3.6 3.2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" opacity=".65"/><path d="M26.6 17.4l.7 1.9 1.9.7-1.9.7-.7 1.9-.7-1.9-1.9-.7 1.9-.7z" fill="currentColor"/></svg></span>
 
         <span class="entrada__col"><span class="fugaz fugaz--btn" id="fugazA"></span>
-        <span class="entrada__t">Cumplí tu sueño</span>
+        <span class="entrada__t">Cumplí <span class="solo-esc">tu <b>sueño</b></span><span class="solo-mov">tu sueño</span></span>
         <span class="entrada__dato" id="datoSuenos"></span>
         <span class="entrada__bajada solo-esc">Contanos tu sueño<br>y ayudanos a hacerlo realidad.</span>
         <span class="entrada__cta solo-esc">Contar mi sueño <i>&#8594;</i></span></span>
@@ -4955,7 +4976,7 @@ body:not(.es-fundacion) #screen-avisos .aviso__cta{margin-top:8px}
          este botón, el mismo que cierra la presentación al final del paso a
          paso. Cuál de los dos se ve lo decide la clase es-repetida. -->
     <button class="cta cta--corto intro__cta intro__cta--acto1" id="introEmpezar1" style="--i:7">
-      <span class="cta__txt">Entrar</span>
+      <span class="cta__txt">ENTRAR</span>
       <svg class="intro__cta-f" viewBox="0 0 24 24" fill="none" stroke="currentColor"
            stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M4 12h15"/><path d="M13.5 6.5 19.5 12l-6 5.5"/></svg>
@@ -5021,7 +5042,7 @@ body:not(.es-fundacion) #screen-avisos .aviso__cta{margin-top:8px}
         <!-- La marca la dice el botón: acá quedaba escrita dos veces seguidas. -->
 
         <button class="cta cta--corto intro__cta" id="introEmpezar">
-          <span class="cta__txt">Entrar</span>
+          <span class="cta__txt">ENTRAR</span>
           <svg class="intro__cta-f" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M4 12h15"/><path d="M13.5 6.5 19.5 12l-6 5.5"/></svg>
@@ -5628,6 +5649,62 @@ function semilla(){
         return {id:nid("pl"), nivel:i+1, nombre:"Nivel "+(i+1), monto:monto,
                 beneficio:beneficios[i] || ""};
       });
+    });
+  })();
+
+  // Las trece fundaciones que no traían agenda propia. Igual que el resto de
+  // la demo, son eventos inventados: sirven para que la pantalla de
+  // actividades y los perfiles no queden vacíos.
+  (function(){
+    var agenda = {
+      fLel:["12 de marzo", "Puertas abiertas del laboratorio",
+            "Instituto Leloir, Parque Centenario, Ciudad de Buenos Aires",
+            "Una tarde para recorrer los laboratorios con los investigadores, ver en qué trabaja cada grupo y entender cómo se financia la ciencia que se hace en el país."],
+      fSi:["5 de abril", "Noche solidaria en la calle",
+           "Punto de encuentro: Plaza Miserere, Ciudad de Buenos Aires",
+           "Salida de la ronda nocturna con voluntarios nuevos: se reparte comida caliente y abrigo, y se acompaña a quienes duermen a la intemperie."],
+      fPot:["23 de abril", "Encuentro de organizaciones sociales",
+            "Centro Metropolitano de Diseño, Ciudad de Buenos Aires",
+            "Jornada de trabajo entre organizaciones que acompañan a personas en situación de vulnerabilidad, para compartir programas y armar respuestas conjuntas."],
+      fIsf:["9 de mayo", "Taller de agua segura",
+            "Facultad de Ingeniería, Ciudad de Buenos Aires",
+            "Los equipos técnicos muestran cómo se diseñan y sostienen los sistemas de agua potable que se instalan en comunidades rurales."],
+      fCar:["18 de mayo", "Colecta anual de Cáritas",
+            "Parroquias de todo el país",
+            "La colecta que sostiene los comedores, roperos y programas de emergencia durante el año. Se puede colaborar en cualquier parroquia o desde la app."],
+      fBra:["30 de mayo", "Feria de la tierra colorada",
+            "Costanera de Posadas, Misiones",
+            "Feria de productores y artesanos de la zona: lo recaudado va a los talleres de oficios para jóvenes de los barrios de Posadas."],
+      fRaf:["14 de junio", "Murga y peña en La Boca",
+            "Casa Rafael, La Boca, Ciudad de Buenos Aires",
+            "Tarde de murga, comida y juegos con las familias del barrio, abierta a quien quiera acercarse a conocer el trabajo de la casa."],
+      fCub:["28 de junio", "Torneo solidario de fútbol",
+            "Club Villa de Mayo, Buenos Aires",
+            "Torneo de equipos mixtos a beneficio de los programas de acompañamiento escolar. Se inscribe por equipo y se juega todo el día."],
+      fEsp:["11 de julio", "Partido en la unidad",
+            "Unidad 48, San Martín, Buenos Aires",
+            "El clásico partido entre el equipo de la unidad y un equipo invitado, con almuerzo compartido y charla abierta sobre reinserción."],
+      fFon:["2 de agosto", "Encuentro de becarios y padrinos",
+            "Centro Cultural Córdoba, Córdoba",
+            "Los chicos y chicas becados cuentan cómo les fue en el año y conocen en persona a quienes acompañan sus estudios."],
+      fTec:["16 de agosto", "Construcción de fin de semana",
+            "Barrio San Cayetano, La Matanza, Buenos Aires",
+            "Dos días de construcción junto a las familias del barrio. No hace falta experiencia previa: se trabaja en cuadrillas con un responsable de obra."],
+      fMal:["6 de septiembre", "Visita guiada a beneficio",
+            "Malba, Palermo, Ciudad de Buenos Aires",
+            "Recorrido nocturno por la colección permanente con los curadores del museo. Lo recaudado sostiene el programa de educación para escuelas."],
+      fGar:["27 de septiembre", "Jornada de puertas abiertas de la Casa Garrahan",
+            "Casa Garrahan, Ciudad de Buenos Aires",
+            "Las familias que se alojan en la casa mientras sus hijos se tratan en el hospital abren sus puertas para mostrar cómo funciona el hogar."]
+    };
+    DB.fundaciones.forEach(function(f){
+      var ev = agenda[f.id];
+      if(!ev || (f.eventos||[]).length) return;
+      // Los eventos sin imagen se descartan más abajo: como no hay fotos de
+      // estas actividades, se usa el logo de la propia fundación.
+      if(!f.foto) return;
+      f.eventos = [{id:nid("ev"), f:ev[0], n:ev[1], lugar:ev[2], desc:ev[3],
+                    imagen:f.foto, asistentes:[]}];
     });
   })();
 
@@ -7208,7 +7285,7 @@ function pintarPanelFundacion(){
          return '<div class="fplan">'+
            '<div class="fplan__t"><b>'+esc(pl.nombre)+'</b>'+
              '<span>'+pesos(pl.monto)+'<i>/mes</i></span></div>'+
-           (pl.beneficio ? '<p class="fplan__d">'+esc(pl.beneficio)+'</p>' : '')+
+
            '<span class="fplan__gente">'+cuantos+
              (cuantos===1 ? ' persona apoyando' : ' personas apoyando')+'</span>'+
          '</div>';
@@ -7638,8 +7715,20 @@ function pintarDatosMenu(){
   poner("datoSuenos", "Contanos tu sueño");
   ponerN("datoSubastas", subastas, subastas===1 ? "sueño en juego" : "sueños en juego");
   ponerN("datoLotes", lotes, lotes===1 ? "sueño esperando" : "sueños esperando");
+  // Una línea más de contexto donde hay un dato cierto que dar.
+  function pie(id, txt){
+    var e = $("#"+id); if(!e) return;
+    var p = e.parentNode.querySelector(".dato__pie");
+    if(!txt){ if(p) p.remove(); return; }
+    if(!p){ p = document.createElement("span"); p.className = "dato__pie"; e.insertAdjacentElement("afterend", p); }
+    p.textContent = txt;
+  }
+  pie("datoLotes", lotes ? "Aprobados, a la espera de salir" : "");
   var eventos = DB.fundaciones.reduce(function(n,f){ return n + ((f.eventos||[]).length); }, 0);
   ponerN("datoEventos", eventos, eventos===1 ? "actividad próxima" : "actividades próximas");
+  var prox = null;
+  DB.fundaciones.forEach(function(f){ (f.eventos||[]).forEach(function(e){ if(!prox && e.f) prox = e.f; }); });
+  pie("datoEventos", prox ? "La próxima · "+prox : "");
   ponerN("datoFund", DB.fundaciones.length, "fundaciones verificadas");
 }
 
@@ -8370,9 +8459,6 @@ function pintarFundacionAbierta(){
         return '<article class="fplan'+(yoEstoy?' es-mio':'')+'">'+
           '<span class="fplan__nivel">'+esc(pl.nombre)+'</span>'+
           '<span class="fplan__monto">'+pesos(pl.monto)+'<i>/mes</i></span>'+
-          (pl.beneficio
-            ? '<p class="fplan__que">'+esc(pl.beneficio)+'</p>'
-            : '<p class="fplan__que fplan__que--vacio">Aporte libre, sin contrapartida.</p>')+
           '<span class="fplan__gente">'+
             (gente ? gente+(gente===1?' persona apoyando':' personas apoyando')
                    : 'Todavía nadie')+'</span>'+
@@ -8393,12 +8479,6 @@ function pintarFundacionAbierta(){
 
     '<p class="subhead" id="anclaPlanes"><span>Apoyo mensual</span></p>'+
     bloqueApoyo()+
-
-    '<div class="titulazo"><h3>Campañas <b>abiertas</b></h3>'+
-      '<span class="titulazo__nota">'+(f.causas||[]).length+' en curso · cada una con su meta</span></div>'+
-    ((f.causas||[]).length
-      ? '<div class="stack">'+f.causas.map(function(c){ return bloqueCausa(c, f.id, false); }).join("")+'</div>'
-      : '<div class="empty">Sin campañas cargadas.</div>')+
 
     '<p class="subhead" id="anclaEventos"><span>Próximos eventos</span></p>'+
     ((f.eventos||[]).length
@@ -8800,6 +8880,7 @@ function marcarTab(cual){
 
 function abrirPantalla(id, despues){
   document.body.classList.remove("perfil-fund");
+  if(id !== "screen-fundaciones") document.body.classList.remove("es-listado");
   apagarNoche();
   marcarTab("");
   document.body.classList.remove("portada");
@@ -8823,6 +8904,9 @@ function abrirSubastas(){
   document.body.classList.add("sin-scroll");
 }
 function abrirFundaciones(){
+  // Esta pantalla se recorre entera: no lleva barra inferior y se desplaza
+  // como una página normal.
+  document.body.classList.add("es-listado");
   var sel = document.getElementById("fxLugar");
   if(sel && !sel.dataset.listo){
     sel.dataset.listo = "1";
@@ -10265,7 +10349,7 @@ function pintarFSubastas(){
               return '<div class="rend">'+
                 '<div class="rend__t"><b>'+esc(pl.nombre)+'</b>'+
                   '<span class="rend__m">'+pesos(pl.monto)+'<i>/mes</i></span></div>'+
-                (pl.beneficio ? '<p class="rend__d">'+esc(pl.beneficio)+'</p>' : '')+
+
                 '<div class="plan-pie">'+
                   '<span>'+cuantos+(cuantos===1?' suscripto':' suscriptos')+'</span>'+
                   '<button class="btn btn--ghost btn--sm" data-editar-plan="'+pl.id+'">Editar</button>'+
@@ -11602,6 +11686,7 @@ window.addEventListener("load", acomodarFirmaPortada);
 
 function volverHome(){
   document.body.classList.remove("perfil-fund");
+  document.body.classList.remove("es-listado");
   marcarTab("inicio");
   // Una fundación no tiene menú de donante: vuelve a su propio panel.
   if(sesion && esFundacion()){
