@@ -3088,6 +3088,21 @@ body.perfil-quieto{overflow-y:auto !important}
   filter:drop-shadow(0 0 10px var(--halo))}
 .entrada__ico--arte.tiene-arte svg{display:none}
 
+/* Acto 1, versión final: todo centrado sobre el cielo, sin sello. El
+   antetítulo en celeste espaciado, "importancia" y "Y DONÁ" en degradado,
+   "Por eso nace…" como conector y el botón en píldora entera. */
+.intro__lema span{color:#bfe3ff !important;letter-spacing:.26em !important;font-weight:500 !important}
+.intro__nace{display:block !important;margin:clamp(14px,3vh,28px) 0 clamp(4px,1vh,8px);
+  font-size:clamp(12px,1.9vh,18px);font-weight:500;letter-spacing:.3em;text-transform:uppercase;
+  color:rgba(226,240,255,.85)}
+.intro__marca--gr .intro__m2{background:linear-gradient(90deg,#22d3ee 0%,#34e0c8 45%,#4ade80 100%);
+  -webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent}
+.intro__ir{gap:0;padding:clamp(14px,2.2vh,20px) clamp(28px,5vw,44px) !important;
+  background:linear-gradient(90deg,#22d3ee 0%,#34e0c8 40%,#a3e635 100%) !important;
+  font-size:clamp(14px,2.1vh,18px) !important;letter-spacing:.04em !important}
+.intro__ir span{white-space:nowrap}
+.intro__ir i.intro__ir-f{display:inline;width:auto;height:auto;border-radius:0;background:none;color:inherit;
+  font-style:normal;margin-left:10px;font-size:1.15em}
 /* Acto 1 según el plano: antetítulo en versalita, titular en tres renglones
    con "importancia" en degradado, sello, marca, bajada y botón de píldora. */
 .intro__lema span{font-size:.42em !important;font-weight:700;letter-spacing:.22em;
@@ -5554,16 +5569,13 @@ body:not(.es-fundacion) #screen-avisos .aviso__cta{margin-top:8px}
       <b class="intro__resalte" style="--i:2">importancia</b>
       <b style="--i:3">de su causa.</b>
     </p>
-    <span class="intro__sello" style="--i:4" aria-hidden="true"></span>
+    <p class="intro__nace" style="--i:4">Por eso nace…</p>
     <p class="intro__marca intro__marca--gr" style="--i:5">
       <span class="intro__m1">SOÑÁ</span> <span class="intro__m2">Y DONÁ</span></p>
     <p class="intro__porque" style="--i:6">Una plataforma para que todas las fundaciones,
       sin importar su tamaño, puedan recaudar, crecer y cumplir su misión.</p>
     <button class="intro__pista intro__pista--acto1 intro__ir" style="--i:7">
-      <span>Conocé cómo funciona</span>
-      <i aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
-        stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M4 12h15"/><path d="M13.5 6.5 19.5 12l-6 5.5"/></svg></i>
+      <span>Conocé cómo funciona <i class="intro__ir-f" aria-hidden="true">&#8594;</i></span>
     </button>
 
     <!-- En una visita repetida el paso a paso no se muestra, así que la pista
