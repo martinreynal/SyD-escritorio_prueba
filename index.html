@@ -2268,6 +2268,10 @@ body.portada #screen-home{height:100vh;height:100dvh}
 
 .nav5{position:fixed;left:0;right:0;bottom:0;z-index:80;height:var(--nav-alto);padding-bottom:env(safe-area-inset-bottom);background:#071120;border:0;box-shadow:none;border-radius:0}
 .nav5__fila{height:var(--nav-fila);display:grid;grid-template-columns:repeat(3,1fr);align-items:center}
+/* La barra del donante tiene cuatro entradas desde que existe "Nosotros":
+   con tres columnas la cuarta caía a un segundo renglón. */
+.nav5__fila--donante{grid-template-columns:repeat(4,1fr)}
+.nav5__fila--donante .nav5__txt{white-space:nowrap;font-size:11px}
 /* DEFINICIÓN ÚNICA de qué fila se muestra. Va inmediatamente después de la
    regla que le da display:grid a las dos: si se separa, la de arriba vuelve a
    ganar y aparecen las dos barras superpuestas. */
@@ -3485,6 +3489,36 @@ body:not(.es-fundacion) #screen-avisos .aviso.es-nuevo::before{box-shadow:0 0 0 
 #screen-aporte.ap3-modo .alta__form{display:block !important}
 #screen-aporte.ap3-modo .alta__acciones{position:static;margin-top:18px;padding-bottom:16px}
 
+/* ==================== NOTIFICACIONES ====================
+   Panel de resumen arriba, solapas de categoría y la lista en fichas anchas
+   con la hora y la flecha a la derecha. */
+.av-panel{position:relative;overflow:hidden;display:grid;gap:18px;padding:22px;margin-bottom:18px;
+  border-radius:18px;border:1px solid rgba(45,212,191,.3);
+  background:#071427 var(--ns-tierra) right 30% / cover no-repeat}
+.av-panel::before{content:"";position:absolute;inset:0;
+  background:linear-gradient(90deg,rgba(5,12,23,.93) 0%,rgba(5,12,23,.78) 55%,rgba(5,12,23,.45) 100%)}
+.av-panel__izq,.av-panel__der{position:relative;z-index:1}
+.av-panel__n{margin:0;font-size:clamp(30px,6vw,42px);font-weight:800;letter-spacing:-.02em;color:#fff}
+.av-panel__s{margin:8px 0 0;font-size:14px;color:rgba(226,240,255,.78)}
+.av-panel__der{display:flex;flex-wrap:wrap;align-items:center;gap:14px 26px}
+.av-cuenta b{display:block;font-size:22px;font-weight:700;color:#fff}
+.av-cuenta span{display:block;margin-top:2px;font-size:12.5px;color:rgba(159,196,216,.8)}
+.av-todo{padding:11px 18px;border-radius:11px;cursor:pointer;font-family:inherit;
+  font-size:13.5px;font-weight:600;color:var(--turq);
+  border:1px solid rgba(45,212,191,.5);background:rgba(45,212,191,.07)}
+.av-solapas{gap:4px;border-bottom:1px solid var(--canto);padding:0 0 0 2px;margin-bottom:4px}
+.av-solapas .avisos__f{border:0 !important;background:none !important;border-radius:0;
+  padding:12px 14px;font-size:14.5px;color:rgba(226,240,255,.72)}
+.av-solapas .avisos__f.is-on{color:var(--turq);box-shadow:inset 0 -2px 0 var(--turq)}
+.aviso__ir{position:absolute;right:16px;top:50%;margin-top:-10px;width:20px;height:20px;
+  color:rgba(226,240,255,.55)}
+/* La flecha tiene su propio carril a la derecha: el cuerpo reserva ese ancho
+   y la hora queda dentro del texto. */
+body:not(.es-fundacion) #screen-avisos .aviso__cuerpo{padding-right:52px !important}
+body:not(.es-fundacion) #screen-avisos .aviso__h{margin-right:0}
+.aviso__ir svg{width:100%;height:100%}
+body:not(.es-fundacion) #screen-avisos .aviso__cuerpo{padding-right:44px}
+
 /* ==================== SOBRE NOSOTROS ====================
    Página larga que se recorre entera. Las fotos van en variables para no
    repetir el base64 en el marcado. */
@@ -4668,6 +4702,12 @@ body:not(.es-fundacion) #screen-avisos .aviso__cta{margin-top:8px}
   body:not(.es-fundacion):not(.es-admin) .nav5{display:none !important}
   body:not(.es-fundacion):not(.es-admin){--nav-alto:0px}
   body.es-listado #screen-fundaciones .stats-pantalla,body.es-listado #screen-eventos .stats-pantalla{padding-bottom:32px}
+
+  /* Notificaciones en escritorio: el panel en dos columnas. */
+  .av-panel{grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:40px;padding:26px 30px}
+  .av-panel__der{flex-wrap:nowrap;gap:32px}
+  .av-cuenta{text-align:left}
+  .av-solapas .avisos__f{padding:14px 18px;font-size:15px}
 
   /* Sobre nosotros en escritorio. */
   .ns-hero{padding:70px var(--aire-lat) 80px;min-height:520px;background-position:right 45%}
@@ -10057,21 +10097,31 @@ function pintarAvisos(){
     var nuevos = orden.filter(esNuevoAviso).length;
     var filtroDef = AVISOS_FILTROS.filter(function(f){ return f[0] === avisosFiltro; })[0] || AVISOS_FILTROS[0];
     if(filtroDef[3]) lista = orden.filter(function(a){ return filtroDef[3].indexOf(a.clase || "actividad") > -1; });
+    // Cuántas nuevas hay de cada categoría, para los contadores del panel.
+    function nuevasDe(clases){
+      return orden.filter(function(a){
+        return esNuevoAviso(a) && clases.indexOf(a.clase || "actividad") > -1;
+      }).length;
+    }
+    if(filtroDef[3]) lista = orden.filter(function(a){ return filtroDef[3].indexOf(a.clase || "actividad") > -1; });
     cabecera =
-      '<div class="avisos__cab">'+
-        '<div class="avisos__titulos"><h2 class="avisos__tit">Tus novedades</h2>'+
-          '<p class="avisos__sub">Todo lo que pasó mientras perseguías tus sueños.</p></div>'+
-        '<div class="avisos__acc">'+
-          (nuevos ? '<span class="avisos__pill"><i aria-hidden="true"></i>'+nuevos+(nuevos===1?' nueva':' nuevas')+'</span>' : '')+
-          (nuevos ? '<button class="avisos__todo" id="btnLeerTodo">Marcar todo como leído</button>' : '')+
+      '<section class="av-panel">'+
+        '<div class="av-panel__izq">'+
+          '<p class="ns-eyebrow">Tus novedades</p>'+
+          '<h2 class="av-panel__n">'+(nuevos ? nuevos+' sin leer' : 'Estás al día')+'</h2>'+
+          '<p class="av-panel__s">Todo lo importante sobre tus sueños y apoyos, en un solo lugar.</p>'+
         '</div>'+
-      '</div>'+
-      '<div class="avisos__filtros" role="tablist">'+
+        '<div class="av-panel__der">'+
+          '<div class="av-cuenta"><b>'+nuevasDe(["donacion","aporte"])+'</b><span>Donaciones</span></div>'+
+          '<div class="av-cuenta"><b>'+nuevasDe(["actividad","evento"])+'</b><span>Actividades</span></div>'+
+          '<div class="av-cuenta"><b>'+nuevasDe(["superado"])+'</b><span>Subastas</span></div>'+
+          (nuevos ? '<button class="av-todo" id="btnLeerTodo">Marcar todo como leído</button>' : '')+
+        '</div>'+
+      '</section>'+
+      '<div class="avisos__filtros av-solapas" role="tablist">'+
         AVISOS_FILTROS.map(function(f){
-          var ico = f[2] || ICONOS_AVISO[f[3][0]] || "";
           return '<button class="avisos__f'+(f[0]===avisosFiltro?' is-on':'')+'" data-filtro="'+f[0]+'" role="tab">'+
-            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">'+ico+'</svg>'+
-            esc(f[1])+'</button>';
+            esc(f[0] === "todo" ? "Todas" : f[1])+'</button>';
         }).join("")+
       '</div>';
   }
@@ -10082,7 +10132,7 @@ function pintarAvisos(){
     var d = new Date(a.cuando || Date.now());
     return Math.round((refe.setHours(12,0,0,0) - d.setHours(12,0,0,0)) / 86400000);
   }
-  var grupos = [["Hoy",[]], ["Ayer",[]], ["Esta semana",[]], ["Antes",[]]];
+  var grupos = [["Hoy",[]], ["Ayer",[]], ["Esta semana",[]], ["Más antiguas",[]]];
   lista.forEach(function(av){
     var n = dias(av);
     grupos[n <= 0 ? 0 : (n === 1 ? 1 : (n <= 7 ? 2 : 3))][1].push(av);
@@ -10138,6 +10188,10 @@ function pintarAvisos(){
               (urgente ? '<span class="aviso__cta">Volver a ofertar <span class="aviso__flecha">&#8250;</span></span>' : '')+
             '</span>'+
             (nuevo ? '<span class="aviso__nuevo" aria-hidden="true"></span>' : '')+
+            '<span class="aviso__ir" aria-hidden="true">'+
+              '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" '+
+              'stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h15"/><path d="M13.5 6.5 19.5 12l-6 5.5"/></svg>'+
+            '</span>'+
           '</button>';
         }).join("");
     }).join("")+
@@ -13672,14 +13726,22 @@ try {
 var INTRO_CLAVE = "syd_intro_vista";
 var introVistaEnSesion = false;
 
+// Dónde queda la marca de "ya vi la presentación". localStorage es lo mejor,
+// pero hay contextos que lo bloquean (modo privado, la app dentro de un marco,
+// permisos de terceros). Ahí caemos a sessionStorage y después a una cookie:
+// con cualquiera de las tres, la segunda visita ya no repite el paso a paso.
 function introYaVista(){
   if(introVistaEnSesion) return true;
-  try { return window.localStorage.getItem(INTRO_CLAVE) === "1"; }
-  catch(err){ return false; }
+  try { if(window.localStorage.getItem(INTRO_CLAVE) === "1") return true; } catch(err){}
+  try { if(window.sessionStorage.getItem(INTRO_CLAVE) === "1") return true; } catch(err){}
+  try { if(document.cookie.indexOf(INTRO_CLAVE + "=1") > -1) return true; } catch(err){}
+  return false;
 }
 function marcarIntroVista(){
   introVistaEnSesion = true;
   try { window.localStorage.setItem(INTRO_CLAVE, "1"); } catch(err){}
+  try { window.sessionStorage.setItem(INTRO_CLAVE, "1"); } catch(err){}
+  try { document.cookie = INTRO_CLAVE + "=1; path=/; max-age=31536000; samesite=lax"; } catch(err){}
 }
 
 // Los cinco pasos tienen que entrar sin recortarse. El alto de la pantalla
@@ -13736,8 +13798,10 @@ function pasarAlPasoAPaso(){
 function abrirIntro(){
   var intro = document.getElementById("intro");
   if(!intro) return;
-  introRepetida = introYaVista();
-  intro.classList.toggle("es-repetida", introRepetida);
+  // La presentación se muestra completa siempre: los dos actos, en cada
+  // visita. La marca de "ya vista" queda escrita pero no se consulta acá.
+  introRepetida = false;
+  intro.classList.remove("es-repetida");
   intro.hidden = false;
   intro.classList.add("is-on", "es-acto1");
   clearTimeout(relojActo);
