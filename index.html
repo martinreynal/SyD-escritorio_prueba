@@ -4866,6 +4866,9 @@ body:not(.es-fundacion) #screen-avisos .aviso__cta{margin-top:8px}
   /* 3. El botón mide lo que mide su texto. */
   .intro__cta--acto1{width:auto;min-width:0;align-self:center;padding-left:38px;padding-right:38px}
 }</style>
+<!-- Conexión con el backend real de Soñá y Doná (ver backend.js) -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="backend.js"></script>
 </head>
 <body class="menu-fijo">
 
@@ -5137,7 +5140,10 @@ body:not(.es-fundacion) #screen-avisos .aviso__cta{margin-top:8px}
       </div>
       <button class="cta cta--corto" id="btnLogin"><span class="cta__txt">ENTRAR</span>
         <svg class="intro__cta-f" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12h15"/><path d="M13.5 6.5 19.5 12l-6 5.5"/></svg></button>
-      <div class="pl-o solo-esc" aria-hidden="true"><i></i><span>o</span><i></i></div>
+      <div class="pl-o" aria-hidden="true"><i></i><span>o</span><i></i></div>
+      <button class="cta cta--corto" id="btnGoogle" type="button" style="background:#fff;color:#1f1f1f;border:1px solid rgba(16,36,44,.12);display:flex;align-items:center;justify-content:center;gap:10px">
+        <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.9c1.7-1.57 2.7-3.87 2.7-6.62z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.9-2.26c-.8.54-1.84.86-3.06.86-2.35 0-4.34-1.59-5.05-3.72H.94v2.33A9 9 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.95 10.7A5.4 5.4 0 0 1 3.67 9c0-.59.1-1.16.28-1.7V4.97H.94A9 9 0 0 0 0 9c0 1.45.35 2.83.94 4.03l3.01-2.33z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58C13.46.89 11.43 0 9 0A9 9 0 0 0 .94 4.97l3.01 2.33C4.66 5.17 6.65 3.58 9 3.58z"/></svg>
+        <span class="cta__txt">Continuar con Google</span></button>
       <div class="portada__links pl-links">
         <span class="pl-links__q solo-esc">¿Todavía no tenés cuenta?</span>
         <button class="linkish linkish--fuerte" data-modal="registro">Crear cuenta</button>
@@ -8638,35 +8644,38 @@ function cerrarCrearCuenta(){
   $("#portadaAcceso").hidden = false;
   acomodarFirmaPortada();
 }
-function crearCuenta(){
-  var codigo = generarCodigo();
+// Separa "Nombre y apellido" en dos campos como los pide la base real.
+function separarNombreApellido(texto){
+  var partes = String(texto).trim().split(/\s+/);
+  var nombre = partes.shift() || "";
+  var apellido = partes.join(" ") || nombre;
+  return {nombre:nombre, apellido:apellido};
+}
+
+async function crearCuenta(){
   var n = val("rNombre"), m = val("rMail"), p = $("#rPass").value, p2 = $("#rPass2").value;
-  if(saltarPasos){
-    n = n || "Cuenta de prueba";
-    m = m || "prueba"+Math.floor(Math.random()*900+100)+"@mail.com";
-    cerrarCrearCuenta(); entrarUsuario(m, n);
-    DB.usuarios.push({id:nid("u"), nombre:n, mail:m, rol:"Usuario estándar", estado:"activa", tipo:"usuario"});
-    toast("Registro salteado desde modo admin.");
-    return;
-  }
   if(!n || !m){ toast("Completá tu nombre y tu mail."); return; }
   if(m.indexOf("@") === -1){ toast("Ese mail no parece válido."); return; }
   if(p.length < 8){ toast("La contraseña necesita al menos 8 caracteres."); return; }
   if(p !== p2){ toast("Las contraseñas no coinciden."); return; }
-  modalCodigo({
-    mail:m, codigo:codigo, titulo:"Confirmá tu mail",
-    sub:"Te mandamos un código de 6 caracteres a "+m+".",
-    alConfirmar:function(){
+  var ne = separarNombreApellido(n);
+  try {
+    var r = await SyD.auth.registrarse(m, p);
+    if(r.session){
+      await SyD.usuarios.guardarPerfil(ne);
       cerrarCrearCuenta();
-      entrarUsuario(m, n);
-      DB.usuarios.push({id:nid("u"), nombre:n, mail:m, rol:"Usuario estándar", estado:"activa", tipo:"usuario"});
+      await entrarConSesionReal();
       toast("Cuenta creada. Bienvenida a Soñá y Doná.");
+    } else {
+      cerrarCrearCuenta();
+      toast("¡Ya casi! Te mandamos un mail a "+m+" para confirmar tu cuenta.");
     }
-  });
+  } catch(err) {
+    toast(err.message);
+  }
 }
 
 function modalRegistro(){
-  var codigo = generarCodigo();
   abrirModal({eyebrow:"Crear cuenta", titulo:"Registrarse", sub:"",
     ancho:"grande", clase:"modal--pleno", cancelar:"Volver",
     body: campo("rNombre","Nombre y apellido","text","")+
@@ -8675,29 +8684,27 @@ function modalRegistro(){
           campo("rPass2","Repetir contraseña","password","",
             '<p class="field__hint">Mínimo 8 caracteres.</p>'),
     ok:"Continuar",
-    onOk:function(){
+    onOk:async function(){
       var n=val("rNombre"), m=val("rMail"), p=$("#rPass").value, p2=$("#rPass2").value;
-      if(saltarPasos){
-        n = n || "Cuenta de prueba";
-        m = m || "prueba"+Math.floor(Math.random()*900+100)+"@mail.com";
-        cerrarModal(); entrarUsuario(m, n);
-        DB.usuarios.push({id:nid("u"), nombre:n, mail:m, rol:"Usuario estándar", estado:"activa", tipo:"usuario"});
-        toast("Registro salteado desde modo admin.");
-        return;
-      }
       if(!n || !m){ toast("Completá tu nombre y tu mail."); return; }
       if(m.indexOf("@") === -1){ toast("Ese mail no parece válido."); return; }
       if(p.length < 8){ toast("La contraseña necesita al menos 8 caracteres."); return; }
       if(p !== p2){ toast("Las contraseñas no coinciden."); return; }
-      modalCodigo({
-        mail:m, codigo:codigo, titulo:"Confirmá tu mail",
-        sub:"Te mandamos un código de 6 caracteres a "+m+".",
-        alConfirmar:function(){
-          entrarUsuario(m, n);
-          DB.usuarios.push({id:nid("u"), nombre:n, mail:m, rol:"Usuario estándar", estado:"activa", tipo:"usuario"});
+      var ne = separarNombreApellido(n);
+      try {
+        var r = await SyD.auth.registrarse(m, p);
+        if(r.session){
+          await SyD.usuarios.guardarPerfil(ne);
+          cerrarModal();
+          await entrarConSesionReal();
           toast("Cuenta creada. Bienvenida a Soñá y Doná.");
+        } else {
+          cerrarModal();
+          toast("¡Ya casi! Te mandamos un mail a "+m+" para confirmar tu cuenta.");
         }
-      });
+      } catch(err) {
+        toast(err.message);
+      }
     }});
 }
 
@@ -12632,7 +12639,51 @@ $("#altaCampos").addEventListener("click", function(e){
   if(c){ alta.canal = c.dataset.canal; pintarAlta(); }
 });
 
-/* ==================== sesión ==================== */
+/* ==================== sesión (real, contra el backend) ==================== */
+// Se llama después de cualquier login exitoso (mail/contraseña o Google) y
+// también al cargar la página si ya había una sesión guardada. Busca el
+// perfil de negocio (nombre, apellido, si es admin) y arma la pantalla
+// correspondiente.
+async function entrarConSesionReal(){
+  var perfil;
+  try {
+    perfil = await SyD.usuarios.obtenerPerfil();
+  } catch (err) {
+    toast("No pudimos cargar tu cuenta. Probá de nuevo.");
+    abrirLogin();
+    return;
+  }
+  if(!perfil){
+    // Primera vez (típico de Google): todavía no completó nombre/apellido.
+    pedirDatosDePerfil();
+    return;
+  }
+  if(perfil.esAdmin){ entrarComoAdmin(); return; }
+  var nombreCompleto = (perfil.nombre+" "+perfil.apellido).trim();
+  sesion = {tipo:"usuario", mail:perfil.email, nombre:nombreCompleto,
+    ini:iniciales(nombreCompleto), color:"#87CEEB", foto:null,
+    handle: armarHandle(nombreCompleto, {})};
+  mostrarApp();
+}
+
+// Modal chico para completar nombre/apellido la primera vez que alguien
+// entra con Google (Google solo nos da el mail, no separa nombre/apellido
+// de la forma en que lo pide el cliente).
+function pedirDatosDePerfil(){
+  abrirModal({eyebrow:"Un paso más", titulo:"Completá tu perfil",
+    sub:"Necesitamos tu nombre y apellido para tu cuenta.",
+    body: campo("pfNombre","Nombre","text","")+campo("pfApellido","Apellido","text",""),
+    ok:"Guardar",
+    onOk:function(){
+      var nombre = val("pfNombre"), apellido = val("pfApellido");
+      if(!nombre || !apellido){ toast("Completá nombre y apellido."); return; }
+      SyD.usuarios.guardarPerfil({nombre:nombre, apellido:apellido}).then(function(){
+        cerrarModal();
+        entrarConSesionReal();
+      }).catch(function(err){ toast(err.message); });
+    }});
+}
+
 function entrarUsuario(mail, nombre){
   var base = nombre || mail.split("@")[0].replace(/[._-]+/g," ").replace(/\b\w/g, function(c){ return c.toUpperCase(); });
   var uReg = DB.usuarios.filter(function(u){ return u.tipo==="usuario" && u.nombre===base; })[0];
@@ -12776,31 +12827,30 @@ if($("#btnOlvide")) $("#btnOlvide").addEventListener("click", function(){
     }});
 });
 
-$("#btnLogin").addEventListener("click", function(){
-  var m = val("mail"), p = $("#pass").value, a = $("#loginAlert");
-  // Beta: atajos para probar cada rol sin credenciales.
-  var clave = (m || "").trim().toLowerCase();
-  if(clave === MAIL_FUNDACION || clave === "fundación" || clave === "fundacion"){
-    if(!MODO_FUNDACION){
-      toast("El acceso como fundación no está disponible en esta versión.");
-      return;
-    }
-    var fx = fundacionPorId(ID_FUNDACION_DEMO) || fundacionPorId("fFav") || DB.fundaciones[0];
-    entrarComoFundacion(fx.id);
-    toast("Entraste como "+fx.nombre+".");
-    return;
-  }
-  if(clave === MAIL_ADMIN || clave === "admin"){
-    entrarComoAdmin();
-    toast("Entraste como administración general.");
-    return;
-  }
-  if(clave === MAIL_DONANTE || clave === "usuario" || clave === ""){ entrarUsuario(MAIL_DONANTE, "Demo"); return; }
-  if(DEMO || saltarPasos){ entrarUsuario(m || MAIL_DONANTE, null); return; }
+$("#btnLogin").addEventListener("click", async function(){
+  var m = val("mail"), p = $("#pass").value, a = $("#loginAlert"), btn = this;
   if(!m || !p){ a.textContent = "Escribí tu mail y tu contraseña para entrar."; a.classList.add("is-on"); return; }
   if(m.indexOf("@") === -1){ a.textContent = "Ese mail no parece válido. Revisalo."; a.classList.add("is-on"); return; }
   a.classList.remove("is-on");
-  entrarUsuario(m, null);
+  btn.disabled = true;
+  try {
+    await SyD.auth.iniciarSesion(m, p);
+    await entrarConSesionReal();
+  } catch(err) {
+    a.textContent = err.message || "No pudimos iniciar tu sesión.";
+    a.classList.add("is-on");
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+if($("#btnGoogle")) $("#btnGoogle").addEventListener("click", async function(){
+  try {
+    await SyD.auth.iniciarSesionConGoogle();
+    // Google redirige la página entera acá — no hay más que hacer en este click.
+  } catch(err) {
+    toast(err.message || "No pudimos conectar con Google.");
+  }
 });
 ["mail","pass"].forEach(function(id){
   $("#"+id).addEventListener("keydown", function(e){ if(e.key === "Enter") $("#btnLogin").click(); });
@@ -13127,11 +13177,12 @@ document.addEventListener("click", function(e){
   if(e.target.closest("#btnAnonimo")) return alternarAnonimo();
   if(e.target.closest("#btnInvitar")) return modalInvitar();
   if(e.target.closest("#upSalir")){
-    cerrarModal(); sesion = null; pintarTodo(); abrirLogin();
+    cerrarModal(); SyD.auth.cerrarSesion(); sesion = null; pintarTodo(); abrirLogin();
     toast("Cerraste sesión.");
     return;
   }
   if(e.target.closest("#btnCerrarSesion")){
+    SyD.auth.cerrarSesion();
     sesion = null;
     pintarTodo();
     abrirLogin();
@@ -13238,6 +13289,7 @@ function entrarComoAdmin(){
 }
 
 function salirDeAdmin(){
+  SyD.auth.cerrarSesion();
   sesion = null;
   document.body.classList.remove("es-admin");
   pintarTodo();
@@ -13691,14 +13743,32 @@ function pausarSubastaDeSueno(id){
 // fallo no se lleve puestos a los demás.
 try { irA(1); } catch(err){}
 try { pintarTodo(); } catch(err){}
-try {
-  entrarUsuario(MAIL_DONANTE, "Demo");
-} catch(err) {
-  // Aunque falle, la pantalla tiene que quedar en el menú.
-  document.body.classList.remove("portada");
-  $$(".screen").forEach(function(sc){ sc.classList.remove("is-active"); });
-  var pa = document.getElementById("screen-app"); if(pa) pa.classList.add("is-active");
-}
+
+// Sesión real: si ya había una guardada (o Google nos acaba de redirigir de
+// vuelta con una), entramos directo. Si no, se ve la portada de acceso —
+// como pide el cliente, no hace falta cuenta para solo mirar la web.
+(async function iniciarSesionReal(){
+  try {
+    var sesionSb = await SyD.auth.sesionActual();
+    if(sesionSb){ await entrarConSesionReal(); }
+    else { abrirLogin(); }
+  } catch(err) {
+    console.error("[SyD] Error al iniciar sesión:", err);
+    abrirLogin();
+  }
+})();
+
+// Reacciona a cambios de sesión que pasen DESPUÉS de esta carga inicial:
+// volver de Google, o cerrar sesión desde otra pestaña.
+SyD.auth.onCambioDeSesion(function(sesionSb){
+  if(sesionSb && !sesion){
+    entrarConSesionReal().catch(function(err){ toast(err.message); });
+  } else if(!sesionSb && sesion){
+    sesion = null;
+    pintarTodo();
+    abrirLogin();
+  }
+});
 // Cierre: se vuelve a fijar la pestaña del menú y se remide, ya con todo
 // dibujado. Sin esto, el primer reparto queda hecho sobre medidas a medio
 // asentar y el menú puede aparecer descolocado.
