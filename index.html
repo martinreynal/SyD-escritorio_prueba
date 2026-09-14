@@ -8652,6 +8652,16 @@ function separarNombreApellido(texto){
   return {nombre:nombre, apellido:apellido};
 }
 
+// Supabase, por seguridad, no dice explícitamente "este mail ya existe"
+// (así nadie puede usar el registro para averiguar qué mails están
+// registrados) — pero deja una pista: si el mail ya tenía una cuenta,
+// `identities` viene vacío en vez de traer la identidad recién creada.
+// Sin este chequeo, la app le miente al usuario diciendo "te mandamos un
+// mail" cuando en realidad no se mandó nada.
+function mailYaTeniaCuenta(r){
+  return !!(r && r.user && Array.isArray(r.user.identities) && r.user.identities.length === 0);
+}
+
 async function crearCuenta(){
   var n = val("rNombre"), m = val("rMail"), p = $("#rPass").value, p2 = $("#rPass2").value;
   if(!n || !m){ toast("Completá tu nombre y tu mail."); return; }
@@ -8661,6 +8671,10 @@ async function crearCuenta(){
   var ne = separarNombreApellido(n);
   try {
     var r = await SyD.auth.registrarse(m, p);
+    if(mailYaTeniaCuenta(r)){
+      toast("Ese mail ya tiene una cuenta. Iniciá sesión, o entrá con Google si te registraste así.");
+      return;
+    }
     if(r.session){
       await SyD.usuarios.guardarPerfil(ne);
       cerrarCrearCuenta();
@@ -8693,6 +8707,10 @@ function modalRegistro(){
       var ne = separarNombreApellido(n);
       try {
         var r = await SyD.auth.registrarse(m, p);
+        if(mailYaTeniaCuenta(r)){
+          toast("Ese mail ya tiene una cuenta. Iniciá sesión, o entrá con Google si te registraste así.");
+          return;
+        }
         if(r.session){
           await SyD.usuarios.guardarPerfil(ne);
           cerrarModal();
@@ -13743,6 +13761,20 @@ function pausarSubastaDeSueno(id){
 // fallo no se lleve puestos a los demás.
 try { irA(1); } catch(err){}
 try { pintarTodo(); } catch(err){}
+
+// Si Google (o cualquier login por redirect) falló, Supabase vuelve acá con
+// ?error=...&error_description=... en la URL. Sin esto, la persona que lo
+// sufre no tiene ninguna pista de qué pasó — solo ve que "no entra".
+(function avisarErrorDeLoginSiHay(){
+  var params = new URLSearchParams(location.search);
+  if(!params.has("error")) return;
+  var codigo = params.get("error_code") || "";
+  var mensaje = codigo === "bad_oauth_state"
+    ? "El login se interrumpió (se abrió más de una vez a la vez). Probá de nuevo con una sola pestaña."
+    : "No pudimos completar el inicio de sesión. Probá de nuevo.";
+  toast(mensaje);
+  history.replaceState(null, "", location.pathname);
+})();
 
 // Sesión real: si ya había una guardada (o Google nos acaba de redirigir de
 // vuelta con una), entramos directo. Si no, se ve la portada de acceso —
