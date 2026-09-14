@@ -4693,6 +4693,10 @@ body:not(.es-fundacion) #screen-avisos .aviso__cta{margin-top:8px}
   body:not(.es-fundacion):not(.es-admin):not(.portada) .screen.is-active{padding-top:66px}
   body:not(.es-fundacion):not(.es-admin):not(.portada) #screen-app.is-active{padding-top:0}
   body.perfil-fund:not(.es-fundacion):not(.es-admin):not(.portada) #screen-app.is-active{padding-top:66px !important}
+  /* Mismo caso que perfil-fund: el panel de "mi cuenta" (perfil-quieto) usa
+     su propio layout de altura fija y también quedaba tapado por la
+     cabecera fija de escritorio — le faltaba esta misma compensación. */
+  body.perfil-quieto:not(.es-fundacion):not(.es-admin):not(.portada) #screen-app.is-active{padding-top:66px !important}
   body.perfil-fund #vistaDetalle{height:calc(100dvh - 66px)}
   body:not(.es-fundacion):not(.es-admin) .placa{top:66px}
   /* el indicador de pasos del sueño vive bajo la cabecera, no encima */
@@ -8665,6 +8669,7 @@ function mailYaTeniaCuenta(r){
 async function crearCuenta(){
   var n = val("rNombre"), m = val("rMail"), p = $("#rPass").value, p2 = $("#rPass2").value;
   if(!n || !m){ toast("Completá tu nombre y tu mail."); return; }
+  if(n.trim().split(/\s+/).length < 2){ toast("Escribí tu nombre y tu apellido, separados por un espacio."); return; }
   if(m.indexOf("@") === -1){ toast("Ese mail no parece válido."); return; }
   if(p.length < 8){ toast("La contraseña necesita al menos 8 caracteres."); return; }
   if(p !== p2){ toast("Las contraseñas no coinciden."); return; }
@@ -8701,6 +8706,7 @@ function modalRegistro(){
     onOk:async function(){
       var n=val("rNombre"), m=val("rMail"), p=$("#rPass").value, p2=$("#rPass2").value;
       if(!n || !m){ toast("Completá tu nombre y tu mail."); return; }
+      if(n.trim().split(/\s+/).length < 2){ toast("Escribí tu nombre y tu apellido, separados por un espacio."); return; }
       if(m.indexOf("@") === -1){ toast("Ese mail no parece válido."); return; }
       if(p.length < 8){ toast("La contraseña necesita al menos 8 caracteres."); return; }
       if(p !== p2){ toast("Las contraseñas no coinciden."); return; }
