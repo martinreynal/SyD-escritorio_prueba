@@ -8770,6 +8770,26 @@ var METODOS_PAGO = [
 var MARCAS_TARJETA = ["Visa","Mastercard","American Express","Cabal","Naranja X"];
 
 // Donación de un solo paso: el pago aparece recién cuando el monto está puesto.
+// El registro de fundaciones no es self-service — las carga el equipo de
+// Soñá y Doná desde el panel de administrador, con su link de pago real.
+// Antes esto era un formulario entero que al final decía "no disponible":
+// mala experiencia. Ahora es directo: cómo contactarse, y listo.
+function modalContactoFundacion(){
+  abrirModal({
+    eyebrow: "¿Representás una fundación?",
+    titulo: "Sumate a Soñá y Doná",
+    sub: "",
+    body:
+      '<p>No hace falta que te registres vos: escribinos y nuestro equipo '+
+      'suma tu fundación a la plataforma, con el link de pago que nos indiques.</p>'+
+      // TODO: reemplazar por el mail/WhatsApp real de contacto de Soñá y Doná
+      // apenas el cliente lo confirme.
+      '<p><b>Contacto:</b> <a href="mailto:contacto@sonaydona.com">contacto@sonaydona.com</a></p>',
+    ok: false,
+    cancelar: "Cerrar"
+  });
+}
+
 function modalDonarDirecto(fid, campanaId){
   if(!puedeAportar()){ toast("Las fundaciones reciben donaciones, no las hacen."); return; }
   var f = fundacionPorId(fid); if(!f) return;
@@ -12879,6 +12899,7 @@ document.addEventListener("click", function(e){
   }
   if((t = e.target.closest("[data-pantalla]"))){
     if(t.dataset.pantalla==="volver") volverDeAlta();
+    else if(t.dataset.pantalla==="fundacion") modalContactoFundacion();
     else abrirPantallaAlta(t.dataset.pantalla);
     return;
   }
