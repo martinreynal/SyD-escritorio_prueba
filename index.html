@@ -13955,12 +13955,26 @@ function abrirIntro(){
   document.addEventListener("keydown", function(e){
     if(e.key === "Escape") cerrarIntro();
   });
-  // La primera vez que este dispositivo abre la app se ve la presentación
-  // completa: la portada y el paso a paso. A partir de la segunda visita se ve
-  // sólo la portada, con el botón para entrar. Se sale tocando "Saltar" o el
-  // botón. Si el navegador no deja guardar la marca (modo privado, permisos),
-  // se muestra completa de nuevo: no se rompe nada, sólo se repite.
-  abrirIntro();
+  // La intro es una bienvenida para quien todavía no tiene cuenta — no
+  // tiene sentido mostrársela a alguien que ya inició sesión (o que Google
+  // acaba de traer de vuelta con una sesión nueva). Lo chequeamos leyendo
+  // directo el localStorage de Supabase: es sincrónico, así no hay que
+  // esperar al chequeo asíncrono de sesión para decidir si mostrarla.
+  function pareceHaberSesionGuardada(){
+    try {
+      return Object.keys(window.localStorage).some(function(k){
+        return /^sb-.+-auth-token$/.test(k);
+      });
+    } catch(err) { return false; }
+  }
+
+  // La primera vez que este dispositivo abre la app (sin sesión) se ve la
+  // presentación completa: la portada y el paso a paso. A partir de la
+  // segunda visita se ve sólo la portada, con el botón para entrar. Se sale
+  // tocando "Saltar" o el botón. Si el navegador no deja guardar la marca
+  // (modo privado, permisos), se muestra completa de nuevo: no se rompe
+  // nada, sólo se repite.
+  if(!pareceHaberSesionGuardada()) abrirIntro();
 })();
 
 </script>
