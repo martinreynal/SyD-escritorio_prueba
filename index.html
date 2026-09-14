@@ -1577,6 +1577,7 @@ body.es-admin #screen-admin.is-active{display:block;height:auto}
 .adm-fund{display:flex;align-items:center;gap:11px;padding:11px 13px;border-radius:16px;
   margin-bottom:9px;background:rgba(255,255,255,.04);box-shadow:0 0 0 1px var(--canto)}
 .adm-fund.es-suspendida{opacity:.6}
+.adm-fund.es-alerta{box-shadow:0 0 0 1px rgba(251,191,36,.5);background:rgba(251,191,36,.06)}
 .adm-fund__av{flex:none;width:40px;height:40px;border-radius:50%;display:grid;place-items:center;
   background:#fff center/cover no-repeat;color:#0b1b2c;font-size:13px;font-weight:800}
 .adm-fund__t{flex:1;min-width:0}
@@ -8772,21 +8773,36 @@ var MARCAS_TARJETA = ["Visa","Mastercard","American Express","Cabal","Naranja X"
 // Donación de un solo paso: el pago aparece recién cuando el monto está puesto.
 // El registro de fundaciones no es self-service — las carga el equipo de
 // Soñá y Doná desde el panel de administrador, con su link de pago real.
-// Antes esto era un formulario entero que al final decía "no disponible":
-// mala experiencia. Ahora es directo: cómo contactarse, y listo.
+// Pero el pedido SÍ queda registrado de verdad (no es un simple mailto):
+// aparece como alerta en el admin, que decide si la contacta.
 function modalContactoFundacion(){
   abrirModal({
     eyebrow: "¿Representás una fundación?",
     titulo: "Sumate a Soñá y Doná",
-    sub: "",
+    sub: "Dejanos tus datos y nuestro equipo te contacta para sumar tu fundación.",
     body:
-      '<p>No hace falta que te registres vos: escribinos y nuestro equipo '+
-      'suma tu fundación a la plataforma, con el link de pago que nos indiques.</p>'+
-      // TODO: reemplazar por el mail/WhatsApp real de contacto de Soñá y Doná
-      // apenas el cliente lo confirme.
-      '<p><b>Contacto:</b> <a href="mailto:contacto@sonaydona.com">contacto@sonaydona.com</a></p>',
-    ok: false,
-    cancelar: "Cerrar"
+      campo("cfNombre","Nombre de la fundación","text","") +
+      campo("cfMail","Mail de contacto","email","") +
+      campo("cfTelefono","Teléfono (opcional)","text","") +
+      campo("cfMensaje","Contanos brevemente de la fundación (opcional)","textarea",""),
+    ok: "Enviar",
+    onOk:async function(){
+      var nombre = val("cfNombre"), mail = val("cfMail");
+      if(!nombre){ toast("Poné el nombre de la fundación."); return; }
+      if(!mail || mail.indexOf("@") === -1){ toast("Poné un mail válido."); return; }
+      try {
+        await SyD.solicitudesFundacion.crear({
+          nombre: nombre,
+          mail: mail,
+          telefono: val("cfTelefono") || undefined,
+          mensaje: val("cfMensaje") || undefined,
+        });
+        cerrarModal();
+        toast("¡Listo! Nuestro equipo se va a poner en contacto pronto.");
+      } catch(err) {
+        toast(err.message);
+      }
+    }
   });
 }
 
@@ -13121,6 +13137,16 @@ document.addEventListener("click", function(e){
       .catch(function(err){ toast(err.message); });
     return;
   }
+  if((t = e.target.closest("[data-atender-solicitud]"))){
+    var idSol = t.dataset.atenderSolicitud, yaAtendida = t.dataset.atendida === "true";
+    SyD.solicitudesFundacion.marcarAtendida(idSol, !yaAtendida)
+      .then(function(){
+        toast(yaAtendida ? "Marcada como pendiente." : "Marcada como atendida.");
+        pintarAdmin();
+      })
+      .catch(function(err){ toast(err.message); });
+    return;
+  }
 
   if(e.target.closest("#apVolverSueno")){ aporte.paso = 0; pintarAporte(); return; }
   if(e.target.closest("#nsComo")){
@@ -13385,6 +13411,70 @@ function cifrasPlataforma(){
 // Trae TODAS las fundaciones (activas y suspendidas) y las pinta en la
 // pestaña de admin. Es async porque habla con la API de verdad — por eso
 // pintarAdmin() solo dispara esto y listo, no puede esperar el resultado.
+// ── Usuarios (CRM real) ──────────────────────────────────────────────
+async function cargarUsuariosAdmin(caja){
+  var usuarios;
+  try {
+    usuarios = await SyD.admin.usuarios();
+  } catch(err) {
+    caja.innerHTML = '<p class="rec-nota">No pudimos cargar los usuarios: '+esc(err.message)+'</p>';
+    return;
+  }
+  if(adminSeccion !== "usuarios") return;
+
+  caja.innerHTML =
+    '<p class="rec-nota">Todas las personas registradas en el sistema.</p>'+
+    (usuarios.length === 0
+      ? '<div class="empty">Todavía no se registró nadie.</div>'
+      : usuarios.map(function(u){
+          var nombreCompleto = (u.nombre+" "+u.apellido).trim();
+          return '<div class="adm-fund">'+
+            '<span class="adm-fund__av">'+esc(iniciales(nombreCompleto))+'</span>'+
+            '<span class="adm-fund__t"><b>'+esc(nombreCompleto)+'</b>'+
+              '<span>'+esc(u.email)+(u.telefono ? ' · '+esc(u.telefono) : '')+'</span>'+
+              '<span>'+u._count.suenos+(u._count.suenos===1?' sueño':' sueños')+
+                ' · '+u._count.ofertas+(u._count.ofertas===1?' oferta':' ofertas')+
+                ' · '+u._count.donaciones+(u._count.donaciones===1?' donación':' donaciones')+'</span>'+
+              (u.esAdmin ? '<span class="adm-estado es-activa">Administrador</span>' : '')+
+            '</span>'+
+          '</div>';
+        }).join(""));
+}
+
+// ── Solicitudes de fundaciones que quieren sumarse ──────────────────
+var solicitudesFundacionPendientesCount = 0;
+async function cargarSolicitudesFundacionAdmin(caja){
+  var solicitudes;
+  try {
+    solicitudes = await SyD.solicitudesFundacion.listar();
+  } catch(err) {
+    caja.innerHTML = '<p class="rec-nota">No pudimos cargar las solicitudes: '+esc(err.message)+'</p>';
+    return;
+  }
+  solicitudesFundacionPendientesCount = solicitudes.filter(function(s){ return !s.atendida; }).length;
+  if(adminSeccion !== "solicitudes") return;
+
+  caja.innerHTML =
+    '<p class="rec-nota">Fundaciones que pidieron sumarse desde el sitio público.</p>'+
+    (solicitudes.length === 0
+      ? '<div class="empty">Todavía no hay ninguna solicitud.</div>'
+      : solicitudes.map(function(s){
+          var f = new Date(s.createdAt);
+          return '<div class="adm-fund'+(s.atendida?'':' es-alerta')+'">'+
+            '<span class="adm-fund__av">'+esc(iniciales(s.nombre))+'</span>'+
+            '<span class="adm-fund__t"><b>'+esc(s.nombre)+'</b>'+
+              '<span>'+esc(s.mail)+(s.telefono ? ' · '+esc(s.telefono) : '')+
+                ' · '+("0"+f.getDate()).slice(-2)+"/"+("0"+(f.getMonth()+1)).slice(-2)+'</span>'+
+              (s.mensaje ? '<span>'+esc(s.mensaje)+'</span>' : '')+
+              '<span class="adm-estado es-'+(s.atendida?"activa":"suspendida")+'">'+
+              (s.atendida ? "Atendida" : "Pendiente")+'</span>'+
+            '</span>'+
+            '<button class="btn btn--ghost btn--sm" data-atender-solicitud="'+s.id+'" data-atendida="'+s.atendida+'">'+
+              (s.atendida ? "Marcar pendiente" : "Marcar atendida")+'</button>'+
+          '</div>';
+        }).join(""));
+}
+
 var fundacionesAdminCache = [];
 async function cargarFundacionesAdmin(caja){
   var fundaciones;
@@ -13486,6 +13576,7 @@ function pintarAdmin(){
   var secciones = [
     ["tablero", "Tablero", 0],
     ["suenos", "Sueños", d.pendientes.length],
+    ["solicitudes", "Solicitudes", solicitudesFundacionPendientesCount],
     ["usuarios", "Usuarios", 0],
     ["fundaciones", "Fundaciones", 0],
     ["finanzas", "Finanzas", 0],
@@ -13619,64 +13710,16 @@ function pintarAdmin(){
     return;
   }
 
-  // ---- USUARIOS: mismo formato que fundaciones ----
+  // ---- USUARIOS: el CRM real, gente que se registró de verdad ----
   if(adminSeccion === "usuarios"){
-    // Se arma desde la actividad: quien donó, ofertó, pidió un sueño o apoya
-    // todos los meses. No hay padrón aparte.
-    var gente = {};
-    function tocar(nombre, mail){
-      if(!nombre) return null;
-      gente[nombre] = gente[nombre] || {nombre:nombre, mail:mail||"", donado:0,
-        veces:0, suenos:0, ofertas:0, mensual:0, ultima:null};
-      if(mail && !gente[nombre].mail) gente[nombre].mail = mail;
-      return gente[nombre];
-    }
-    d.donaciones.forEach(function(x){
-      var g = tocar(x.anonimo ? "Donante anónimo" : x.quien, x.mail);
-      if(!g) return;
-      g.donado += x.monto || 0; g.veces++;
-      var t = fechaDon(x);
-      if(t && (!g.ultima || t > g.ultima)) g.ultima = t;
-    });
-    d.suscripciones.forEach(function(x){
-      var g = tocar(x.quien, x.mail); if(g) g.mensual += x.monto || 0;
-    });
-    d.sol.forEach(function(x){
-      var g = tocar(x.quien, x.mail); if(g) g.suenos++;
-      (x.ofertas||[]).forEach(function(o){
-        var go = tocar(o.anonimo ? "Donante anónimo" : o.quien, "");
-        if(go) go.ofertas++;
-      });
-    });
-    var lista = Object.keys(gente).map(function(k){ return gente[k]; })
-      .sort(function(a,b){ return (b.donado + b.mensual*12) - (a.donado + a.mensual*12); });
+    caja.innerHTML = '<p class="rec-nota">Cargando usuarios…</p>';
+    cargarUsuariosAdmin(caja);
+    return;
+  }
 
-    caja.innerHTML =
-      '<div class="adm-grilla">'+
-        tarjeta("Usuarios", String(lista.length), "con actividad")+
-        tarjeta("Con apoyo mensual", String(lista.filter(function(g){ return g.mensual; }).length),
-                pesos(d.porMes)+" por mes")+
-      '</div>'+
-      '<p class="frotulo">Todos los usuarios</p>'+
-      lista.map(function(g){
-        var bloqueado = DB.bloqueados[g.nombre];
-        var anon = g.nombre === "Donante anónimo";
-        return '<div class="adm-fund'+(bloqueado?' es-suspendida':'')+'">'+
-          '<span class="adm-fund__av">'+esc(anon ? "?" : iniciales(g.nombre))+'</span>'+
-          '<span class="adm-fund__t"><b>'+esc(g.nombre)+'</b>'+
-            '<span>'+(g.mail ? esc(g.mail)+' · ' : '')+
-              pesos(g.donado)+' donados'+
-              (g.mensual ? ' · '+pesos(g.mensual)+'/mes' : '')+'</span>'+
-            '<span>'+g.suenos+(g.suenos===1?' sueño':' sueños')+
-              ' · '+g.ofertas+(g.ofertas===1?' oferta':' ofertas')+'</span>'+
-            '<span class="adm-estado es-'+(bloqueado?"suspendida":"activa")+'">'+
-            (bloqueado ? "Bloqueado" : "Activo")+'</span>'+
-          '</span>'+
-          (anon ? '' :
-            '<button class="btn btn--ghost btn--sm" data-bloquear="'+esc(g.nombre)+'">'+
-              (bloqueado ? "Desbloquear" : "Bloquear")+'</button>')+
-        '</div>';
-      }).join("");
+  if(adminSeccion === "solicitudes"){
+    caja.innerHTML = '<p class="rec-nota">Cargando solicitudes…</p>';
+    cargarSolicitudesFundacionAdmin(caja);
     return;
   }
 

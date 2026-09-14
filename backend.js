@@ -250,12 +250,30 @@
     auditoria: function () {
       return get("/admin/auditoria");
     },
+    usuarios: function () {
+      return get("/admin/usuarios");
+    },
   };
 
   // ── Fee de subasta ───────────────────────────────────────────────────
   var fee = {
     iniciarCheckout: function (subastaId) {
       return post("/fee/subastas/" + subastaId + "/checkout");
+    },
+  };
+
+  // ── Solicitudes de fundaciones que quieren sumarse ──────────────────
+  // Pública (no hace falta sesión para pedir sumarse). El admin las ve y
+  // decide si contactarlas y darlas de alta a mano en Fundaciones.
+  var solicitudesFundacion = {
+    crear: function (datos) {
+      return post("/solicitudes-fundacion", datos);
+    },
+    listar: function () {
+      return get("/solicitudes-fundacion");
+    },
+    marcarAtendida: function (id, atendida) {
+      return put("/solicitudes-fundacion/" + id, { atendida: atendida });
     },
   };
 
@@ -270,5 +288,6 @@
     donaciones: donaciones,
     admin: admin,
     fee: fee,
+    solicitudesFundacion: solicitudesFundacion,
   };
 })();
