@@ -13905,10 +13905,11 @@ function pasarAlPasoAPaso(){
 function abrirIntro(){
   var intro = document.getElementById("intro");
   if(!intro) return;
-  // La presentación se muestra completa siempre: los dos actos, en cada
-  // visita. La marca de "ya vista" queda escrita pero no se consulta acá.
-  introRepetida = false;
-  intro.classList.remove("es-repetida");
+  // Bug real del mockup original: esta marca se calculaba pero nunca se
+  // usaba, así que la presentación completa (los dos actos) se repetía en
+  // cada carga de página, no solo la primera vez. Ahora sí se consulta.
+  introRepetida = introYaVista();
+  intro.classList.toggle("es-repetida", introRepetida);
   intro.hidden = false;
   intro.classList.add("is-on", "es-acto1");
   clearTimeout(relojActo);
