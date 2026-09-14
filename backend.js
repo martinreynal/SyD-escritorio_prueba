@@ -15,7 +15,8 @@
 
   // ── Configuración ────────────────────────────────────────────────────
   var SUPABASE_URL = "https://howwxnrhzhnwaxsyjstx.supabase.co";
-  var SUPABASE_ANON_KEY = "PENDIENTE_PEGAR_ANON_KEY"; // TODO: reemplazar por la key "anon public" real
+  var SUPABASE_ANON_KEY =
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhvd3d4bnJoemhud2F4c3lqc3R4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg3OTczMzksImV4cCI6MjEwNDM3MzMzOX0.zkRb4UNDhF7TAxPgOsc_AKghz7eCu-YeY0j0FhEzDbA";
 
   // Mientras desarrollamos, la API vive en localhost. El día del deploy a
   // Render, este valor pasa a ser la URL pública del backend (algo como
