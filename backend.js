@@ -89,7 +89,12 @@
     async iniciarSesionConGoogle() {
       var r = await sb.auth.signInWithOAuth({
         provider: "google",
-        options: { redirectTo: window.location.href },
+        // OJO: nunca usar window.location.href acá. Si la URL ya tenía un
+        // "#" (por ejemplo, de un intento anterior que dejó
+        // #access_token=... pegado), Supabase concatena SU hash al final
+        // y queda un "##" — supabase-js no lo puede parsear y la sesión
+        // se pierde en silencio. Por eso se arma la URL limpia a mano.
+        options: { redirectTo: window.location.origin + window.location.pathname },
       });
       if (r.error) throw new Error(traducirErrorAuth(r.error));
       // Google redirige la página entera, acá no hay más que hacer.

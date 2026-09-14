@@ -13761,6 +13761,11 @@ try { pintarTodo(); } catch(err){}
 // Reacciona a cambios de sesión que pasen DESPUÉS de esta carga inicial:
 // volver de Google, o cerrar sesión desde otra pestaña.
 SyD.auth.onCambioDeSesion(function(sesionSb){
+  // Recién ACÁ (después de que supabase-js ya leyó el hash de la URL) se
+  // puede limpiar. Si se limpiara antes, se rompe la detección de sesión.
+  if(sesionSb && location.hash.indexOf("access_token") !== -1){
+    history.replaceState(null, "", location.pathname + location.search);
+  }
   if(sesionSb && !sesion){
     entrarConSesionReal().catch(function(err){ toast(err.message); });
   } else if(!sesionSb && sesion){
