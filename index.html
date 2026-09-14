@@ -8799,23 +8799,16 @@ function modalDonarDirecto(fid, campanaId){
       '<label class="check"><input type="checkbox" id="ddAnon"> Donar de forma anónima</label>'+
 
       '<div class="pago-oculto" id="ddPago">'+
-        '<div class="paso-sep">Método de pago</div>'+
-        '<div class="metodos" id="ddMetodos">'+METODOS_PAGO.map(function(m,i){
-          return '<button type="button" class="metodo'+(i===0?" is-on":"")+'" data-metodo="'+m.id+'" data-nombre="'+esc(m.n)+'">'+
-            '<span class="metodo__n">'+esc(m.n)+'</span><span class="metodo__d">'+esc(m.d)+'</span></button>';
-        }).join("")+'</div>'+
-        '<div id="ddTarjeta"><div class="grid2" style="margin-top:14px">'+
-          '<div class="field"><label for="ddTipo">Tipo</label><select id="ddTipo">'+
-          '<option value="Crédito">Crédito</option><option value="Débito">Débito</option></select></div>'+
-          '<div class="field"><label for="ddMarca">Marca</label><select id="ddMarca">'+
-          MARCAS_TARJETA.map(function(m){ return '<option>'+m+'</option>'; }).join("")+'</select></div></div>'+
-          '</div>'+
         '<div class="pago-total"><span>Total</span><b id="ddTotal">$0</b></div>'+
-        '<p class="field__hint" style="margin-top:10px">Es una demostración: no se pide dato de tarjeta ni se cobra nada.</p>'+
+        '<p class="field__hint" style="margin-top:10px">'+
+          (f.linkPago || f.web
+            ? "Te llevamos al link de pago de "+esc(f.nombre)+" para completarla. Soñá y Doná nunca recibe ni retiene ese dinero."
+            : "Esta fundación todavía no cargó su link de pago — avisale al equipo de Soñá y Doná.")+
+        '</p>'+
       '</div>',
     ok:"Continuar",
     after:function(){
-      var metodo = "Tarjeta", abierto = false;
+      var abierto = false;
 
       // Muestra cuánto de la meta cubre lo que estás escribiendo.
       function pintarAvance(m){
@@ -8855,14 +8848,10 @@ function modalDonarDirecto(fid, campanaId){
 
       pintarAvance(0);
       $("#ddMonto").addEventListener("input", revisarMonto);
-      $("#ddMetodos").addEventListener("click", function(e){
-        var b = e.target.closest(".metodo"); if(!b) return;
-        $$(".metodo", this).forEach(function(x){ x.classList.remove("is-on"); });
-        b.classList.add("is-on");
-        metodo = b.dataset.nombre;
-        $("#ddTarjeta").style.display = (b.dataset.metodo === "tarjeta") ? "block" : "none";
-      });
 
+      // Acá NO se cobra nada: se registra la intención (para poder mostrar
+      // montos recaudados) y se abre el link de pago real de la fundación
+      // en otra pestaña. La plata nunca pasa por nuestro sistema.
       onOk = function(){
         if(!exigirSesion("donar")) return;
         var monto = valPesos("ddMonto");
@@ -8871,18 +8860,23 @@ function modalDonarDirecto(fid, campanaId){
           monto = 25000;   // beta: si no cargaste nada, ponemos un monto de ejemplo
         }
         var anon = $("#ddAnon").checked;
-        var medio = metodo === "Tarjeta" ? $("#ddMarca").value+" "+$("#ddTipo").value.toLowerCase() : metodo;
+        var linkFundacion = f.linkPago || f.web;
         if(campana) campana.r += monto;
         else f.aporteGeneral = (f.aporteGeneral||0) + monto;
         DB.donaciones.push({id:nid("d"), quien:sesion.nombre,
           quienPublico:anon ? "Donante anónimo" : sesion.nombre, anonimo:anon,
           mail:sesion.mail, fid:f.id, causa:destinoTxt, monto:monto,
-          tipo:"directa", metodo:medio, fecha:"hoy", fechaISO:hoyISO()});
+          tipo:"directa", metodo:"Link de la fundación", fecha:"hoy", fechaISO:hoyISO()});
         avisarFundacion(f.id, "Recibiste una donación",
           pesos(monto)+" para "+destinoTxt+".", "recaudacion", "donacion");
 
         cerrarModal(); pintarTodo();
-        toast("¡Gracias! Donaste "+pesos(monto)+(anon?" de forma anónima":"")+" a "+destinoTxt+".");
+        if(linkFundacion){
+          window.open(linkFundacion, "_blank", "noopener");
+          toast("¡Gracias! Completá tu donación de "+pesos(monto)+" en la pestaña que se abrió.");
+        } else {
+          toast("Esta fundación todavía no cargó su link de pago — avisale al equipo de Soñá y Doná.");
+        }
       };
     }});
 }
@@ -11842,8 +11836,6 @@ function avisoGmail(id){
     '<label class="check"><input type="checkbox" id="'+id+'" checked> Abrir Gmail al confirmar</label></div>';
 }
 
-// Costo fijo de publicar un sueño: se dona entero a la fundación elegida.
-var COSTO_PUBLICAR = 20000;
 
 // Los dos pasos del flujo del sueño.
 function pintarPasosSueno(actual){
@@ -12012,8 +12004,8 @@ function pintarAporte(){
             '<span class="sn-costo__i"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" '+
               'stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">'+
               '<path d="M12 20s-7-4.6-7-9.2A4 4 0 0 1 12 8a4 4 0 0 1 7 2.8C19 15.4 12 20 12 20z"/></svg></span>'+
-            '<span class="sn-costo__t"><b>Publicar un sueño tiene un costo de <i>'+pesos(COSTO_PUBLICAR)+'</i></b>'+
-              '<span>Ese monto se dona en su totalidad a la fundación que elijas.</span></span>'+
+            '<span class="sn-costo__t"><b>Publicar tu sueño es gratis</b>'+
+              '<span>Si además querés donar, es opcional y va directo a la fundación que elijas.</span></span>'+
           '</div>'+
           '<div class="campo-neon field--fund">'+
             '<label for="ppFundQ">Elegí la fundación que querés apoyar</label>'+
@@ -12064,16 +12056,20 @@ function pintarAporte(){
     return;
   }
 
-  // --- propuesta de donación: paso 2, el aporte ---
+  // --- propuesta de donación: paso 2, tu aporte voluntario a la fundación ---
+  // Publicar un sueño es gratis (no hay fee de la plataforma acá — el
+  // único fee real del sistema es el de subastar, y es aparte). Si además
+  // la persona quiere donar algo al publicar, no le pedimos tarjeta acá:
+  // la mandamos directo al link de pago real de la fundación elegida.
   if(aporte.modo === "propuesta"){
     pintarPasosSueno(1);
     $("#screen-aporte").classList.add("sn-modo");
     $("#apEyebrow").textContent = "";
     $("#apTitulo").textContent = "Tu aporte";
-    $("#apLede").innerHTML = 'Confirmá el pago para publicar tu sueño.'+
-      '<span class="sn-nota">Es una maqueta: no se cobra nada ni se guardan estos datos.</span>';
+    $("#apLede").innerHTML = 'Publicar tu sueño es gratis. Si además querés donar, te llevamos directo a la fundación.';
     var f = fundacionPorId(aporte.fid);
-    var total = COSTO_PUBLICAR + (aporte.valor || 0);
+    var linkFundacion = f && (f.linkPago || f.web);
+    var total = aporte.valor || 0;
     $("#apCampos").innerHTML =
       '<div class="sn-grid sn-grid--pago">'+
         '<div class="sn-form">'+
@@ -12081,32 +12077,25 @@ function pintarAporte(){
             '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" '+
             'stroke-linejoin="round" aria-hidden="true"><path d="M20 12H5"/><path d="M10.5 6.5 4.5 12l6 5.5"/></svg>'+
             'Volver a mi sueño</button>'+
-          '<div class="campo-neon"><label for="pgNombre">Titular de la tarjeta</label>'+
-            '<input id="pgNombre" type="text" placeholder="Como figura en la tarjeta"></div>'+
-          '<div class="campo-neon"><label for="pgNum">Número de tarjeta</label>'+
-            '<input id="pgNum" type="text" inputmode="numeric" maxlength="19" placeholder="0000 0000 0000 0000"></div>'+
-          '<div class="sn-fila2">'+
-            '<div class="campo-neon"><label for="pgVto">Vencimiento</label>'+
-              '<input id="pgVto" type="text" inputmode="numeric" maxlength="5" placeholder="MM/AA"></div>'+
-            '<div class="campo-neon"><label for="pgCvv">Código</label>'+
-              '<input id="pgCvv" type="text" inputmode="numeric" maxlength="4" placeholder="123"></div>'+
-          '</div>'+
-          '<div class="campo-neon"><label for="pgDoc">Documento del titular</label>'+
-            '<input id="pgDoc" type="text" inputmode="numeric" placeholder="DNI sin puntos"></div>'+
+          (total > 0
+            ? '<div class="sn-costo"><span class="sn-costo__t"><b>Vas a donar '+pesos(total)+'</b>'+
+                '<span>'+(linkFundacion
+                  ? 'Te llevamos al link de pago de '+esc(f.nombre)+' para completarla. Nosotros nunca tocamos ese dinero.'
+                  : 'Esta fundación todavía no cargó su link de pago — avisale al equipo de Soñá y Doná.')+'</span></span></div>'
+            : '<p class="field__hint">Si no querés donar nada ahora, publicá tu sueño igual y listo.</p>')+
         '</div>'+
         '<aside class="sn-previa">'+
           '<div class="sn-previa__cab">'+
             '<span class="sn-previa__i"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" '+
               'stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5.4" width="18" height="13.2" rx="3"/>'+
               '<path d="M3 10h18"/></svg></span>'+
-            '<span><b>Resumen</b><span>Lo que se va a cobrar.</span></span>'+
+            '<span><b>Resumen</b><span>Tu sueño y tu donación, si elegiste donar.</span></span>'+
           '</div>'+
           '<div class="sn-card sn-card--pago">'+
             '<div class="sn-card__c">'+
               '<h3>'+esc(aporte.titulo || "Tu sueño")+'</h3>'+
-              '<div class="sn-card__fila"><span>Costo de publicación</span><div><b>'+pesos(COSTO_PUBLICAR)+'</b></div></div>'+
-              '<div class="sn-card__fila"><span>Tu donación</span><div><b>'+pesos(aporte.valor || 0)+'</b></div></div>'+
-              '<div class="sn-card__fila sn-card__fila--total"><span>Total</span><div><b>'+pesos(total)+'</b><span class="sn-moneda">ARS</span></div></div>'+
+              '<div class="sn-card__fila"><span>Costo de publicación</span><div><b>Gratis</b></div></div>'+
+              '<div class="sn-card__fila sn-card__fila--total"><span>Tu donación</span><div><b>'+pesos(total)+'</b><span class="sn-moneda">ARS</span></div></div>'+
               '<div class="sn-card__fila"><span>Fundación destino</span>'+
                 '<div class="sn-card__fund">'+(f
                   ? '<span class="avatar" style="'+avatarCSS(f)+'">'+(f.foto?"":esc(iniciales(f.nombre)))+'</span>'+esc(f.nombre)
@@ -12114,13 +12103,13 @@ function pintarAporte(){
             '</div>'+
           '</div>'+
           '<p class="sn-aviso"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" '+
-            'stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="10.5" width="15" height="9.5" rx="2.4"/>'+
-            '<path d="M8.2 10.5V8a3.8 3.8 0 0 1 7.6 0v2.5"/></svg>'+
-            'Los datos de la tarjeta no se guardan: esta pantalla es una demostración.</p>'+
+            'stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.6"/>'+
+            '<path d="M12 11v5.4M12 7.8h.01"/></svg>'+
+            'Soñá y Doná nunca recibe ni retiene dinero: tu donación va directo a la fundación.</p>'+
         '</aside>'+
       '</div>';
     $("#apAtras").textContent = "Volver";
-    $("#apEnviar").textContent = "Confirmar y publicar";
+    $("#apEnviar").textContent = total > 0 && linkFundacion ? "Ir a donar y publicar" : "Publicar mi sueño";
     var b = $("#apEnviar"); b.disabled = false; b.classList.remove("es-apagado");
     return;
   }
@@ -12211,12 +12200,11 @@ function avanzarAporte(){
     if(!DEMO || (t1 || x1)){
       if(!t1){ toast("Poné un nombre a tu sueño."); return; }
       if(!x1){ toast("Contanos tu sueño."); return; }
-      if(!(v1 > 0)){ toast("Ponele un monto a tu donación."); return; }
       if(!f1){ toast("Elegí la fundación que querés apoyar."); return; }
     }
     aporte.titulo = t1 || "Mi sueño de prueba";
     aporte.texto = x1 || "Este texto se completó solo para poder seguir probando la maqueta.";
-    aporte.valor = v1 || 350000;
+    aporte.valor = v1; // 0 (o vacío) es válido: donar acá es opcional, no hay fee que cubrir.
     aporte.fid = f1 || DB.fundaciones[0].id;
     aporte.paso = 1;
     pintarAporte();
@@ -12225,12 +12213,6 @@ function avanzarAporte(){
 
   if(aporte.modo === "propuesta"){
     if(!exigirSesion("publicar tu deseo")) return;
-    if(!DEMO){
-      if(!val("pgNombre") || !val("pgNum")){ toast("Completá los datos de la tarjeta."); return; }
-      if(val("pgNum").replace(/\D/g,"").length < 15){ toast("Ese número de tarjeta no parece válido."); return; }
-      if(!/^\d{2}\/\d{2}$/.test(val("pgVto"))){ toast("El vencimiento va como MM/AA."); return; }
-      if(val("pgCvv").length < 3){ toast("Falta el código de seguridad."); return; }
-    }
     var titulo = aporte.titulo, texto = aporte.texto;
     if(DEMO){
       if(!titulo) titulo = "Mi deseo de prueba";
@@ -12240,9 +12222,15 @@ function avanzarAporte(){
       if(!texto){ toast("Contá tu deseo."); return; }
     }
 
-    var valor = aporte.valor || 350000;
+    var valor = aporte.valor || 0;
     var fid = aporte.fid || DB.fundaciones[0].id;
     var f = fundacionPorId(fid);
+    var linkFundacion = f && (f.linkPago || f.web);
+
+    // Si eligió donar algo, la plata va directo a la fundación — nunca
+    // pasa por nuestro sistema. Abrimos su link real en otra pestaña y
+    // seguimos con la publicación del sueño en esta.
+    if(valor > 0 && linkFundacion) window.open(linkFundacion, "_blank", "noopener");
 
     DB.solicitudes.push({id:nid("s"), quien:sesion.nombre, titulo:titulo, aCambio:texto,
       fid:fid, destino:null, valor:valor, asociado:null, estado:"en subasta", cierreISO:"2026-09-08T21:00", fecha:hoyISO(),
@@ -12252,7 +12240,9 @@ function avanzarAporte(){
       titulo+" salió a subasta a beneficio de tu fundación.", "recaudacion", "superado");
 
     cerrarAporte(); pintarTodo();
-    toast("Tu sueño quedó publicado a beneficio de "+f.nombre+".");
+    toast(valor > 0
+      ? "Tu sueño quedó publicado. Completá tu donación en la pestaña que se abrió."
+      : "Tu sueño quedó publicado a beneficio de "+f.nombre+".");
     return;
   }
 
