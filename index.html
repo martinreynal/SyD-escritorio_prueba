@@ -13413,6 +13413,8 @@ async function cargarFundacionesAdmin(caja){
               '<span>'+esc(f.linkPago || "Sin link de pago cargado")+'</span>'+
               '<span class="adm-estado es-'+(suspendida?"suspendida":"activa")+'">'+
               (suspendida ? "Suspendida" : "Activa")+'</span>'+
+              '<span class="adm-estado '+(f.linkFeeSubasta?'es-activa':'es-suspendida')+'">'+
+              (f.linkFeeSubasta ? "Habilitada para subastar" : "Solo donaciones")+'</span>'+
             '</span>'+
             '<button class="btn btn--ghost btn--sm" data-editar-fundacion="'+f.id+'">Editar</button>'+
             '<button class="btn btn--ghost btn--sm" data-suspender-real="'+f.id+'" data-estado="'+(suspendida?"suspendida":"activa")+'">'+
@@ -13433,7 +13435,9 @@ function modalFundacionAdmin(f){
       campo("mfNombre","Nombre","text","") +
       campo("mfDescripcion","Descripción","textarea","") +
       campo("mfLogo","URL del logo (opcional)","text","https://…") +
-      campo("mfLink","Link de pago (obligatorio)","text","https://link.mercadopago.com.ar/…") +
+      campo("mfLink","Link de pago para donaciones (obligatorio)","text","https://link.mercadopago.com.ar/…") +
+      campo("mfLinkFee","Link para cobrar el fee de subasta (opcional)","text","https://link.mercadopago.com.ar/…",
+        '<p class="field__hint">Si lo dejás vacío, esta fundación no aparece como opción para subastar todavía.</p>') +
       campo("mfMail","Mail de contacto (opcional)","email","") +
       campo("mfTelefono","Teléfono de contacto (opcional)","text",""),
     ok: esNueva ? "Crear fundación" : "Guardar cambios",
@@ -13443,6 +13447,7 @@ function modalFundacionAdmin(f){
         $("#mfDescripcion").value = f.descripcion || "";
         $("#mfLogo").value = f.logoUrl || "";
         $("#mfLink").value = f.linkPago || "";
+        $("#mfLinkFee").value = f.linkFeeSubasta || "";
         $("#mfMail").value = f.contactoEmail || "";
         $("#mfTelefono").value = f.contactoTelefono || "";
       }
@@ -13454,6 +13459,7 @@ function modalFundacionAdmin(f){
       var datos = {
         nombre: nombre,
         linkPago: link,
+        linkFeeSubasta: val("mfLinkFee") || undefined,
         descripcion: val("mfDescripcion") || undefined,
         logoUrl: val("mfLogo") || undefined,
         contactoEmail: val("mfMail") || undefined,
