@@ -13705,21 +13705,37 @@ function pintarAdmin(){
     return;
   }
 
-  // ---- auditoría ----
+  // ---- auditoría (real, contra el backend) ----
+  caja.innerHTML = '<p class="rec-nota">Cada decisión administrativa queda registrada con su '+
+    'responsable y su hora.</p><p class="rec-nota">Cargando…</p>';
+  cargarAuditoriaAdmin(caja);
+}
+
+async function cargarAuditoriaAdmin(caja){
+  var eventos;
+  try {
+    eventos = await SyD.admin.auditoria();
+  } catch(err) {
+    caja.innerHTML = '<p class="rec-nota">No pudimos cargar la auditoría: '+esc(err.message)+'</p>';
+    return;
+  }
+  if(adminSeccion !== "auditoria") return; // se cambió de pestaña mientras cargaba
+
   caja.innerHTML =
     '<p class="rec-nota">Cada decisión administrativa queda registrada con su '+
       'responsable y su hora.</p>'+
-    (DB.auditoria.length
-      ? DB.auditoria.map(function(a){
-          var f = new Date(a.cuando);
+    (eventos.length
+      ? eventos.map(function(a){
+          var f = new Date(a.createdAt);
+          var quien = a.admin ? (a.admin.nombre+" "+a.admin.apellido) : "—";
           return '<div class="adm-audit">'+
             '<span class="adm-audit__h">'+("0"+f.getDate()).slice(-2)+"/"+
               ("0"+(f.getMonth()+1)).slice(-2)+" "+
               ("0"+f.getHours()).slice(-2)+":"+("0"+f.getMinutes()).slice(-2)+'</span>'+
             '<span class="adm-audit__t"><b>'+esc(a.accion)+'</b>'+
-              (a.sobre ? '<span>'+esc(a.sobre)+'</span>' : '')+
+              '<span>'+esc(a.entidad)+(a.entidadId ? " · "+esc(a.entidadId) : "")+'</span>'+
               (a.detalle ? '<span>'+esc(a.detalle)+'</span>' : '')+'</span>'+
-            '<span class="adm-audit__q">'+esc(a.quien)+'</span></div>';
+            '<span class="adm-audit__q">'+esc(quien)+'</span></div>';
         }).join("")
       : '<div class="empty">Todavía no hay acciones registradas.</div>');
 }
