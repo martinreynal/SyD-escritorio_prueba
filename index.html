@@ -14048,9 +14048,17 @@ function abrirIntro(){
   // esperar al chequeo asíncrono de sesión para decidir si mostrarla.
   function pareceHaberSesionGuardada(){
     try {
-      return Object.keys(window.localStorage).some(function(k){
+      var yaGuardada = Object.keys(window.localStorage).some(function(k){
         return /^sb-.+-auth-token$/.test(k);
       });
+      // Justo cuando Google redirige de vuelta, la sesión todavía no
+      // terminó de guardarse en localStorage — llega una fracción de
+      // segundo después. Si la URL trae el token en el hash (o un error
+      // de OAuth), ya sabemos que hay sesión en camino (o que NO hay que
+      // mostrar una bienvenida a alguien que recién intentó loguearse):
+      // en ningún caso corresponde mostrar la intro.
+      var sesionEnCamino = /access_token=|[?&]error=/.test(location.hash) || /[?&]error=/.test(location.search);
+      return yaGuardada || sesionEnCamino;
     } catch(err) { return false; }
   }
 
