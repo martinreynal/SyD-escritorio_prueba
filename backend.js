@@ -195,6 +195,10 @@
     listar: function () {
       return get("/fundaciones");
     },
+    // Admin: incluye también las suspendidas (la de arriba solo trae activas).
+    listarTodas: function () {
+      return get("/fundaciones/admin/todas");
+    },
     obtener: function (id) {
       return get("/fundaciones/" + id);
     },
@@ -203,6 +207,9 @@
     },
     editar: function (id, datos) {
       return put("/fundaciones/" + id, datos);
+    },
+    reactivar: function (id) {
+      return put("/fundaciones/" + id, { activa: true });
     },
     suspender: function (id) {
       return del("/fundaciones/" + id);

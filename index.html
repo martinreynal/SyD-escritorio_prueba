@@ -13084,15 +13084,20 @@ document.addEventListener("click", function(e){
     return;
   }
   if(e.target.closest("#adminSalir")) return salirDeAdmin();
-  if((t = e.target.closest("[data-suspender]"))){
-    var fx = fundacionPorId(t.dataset.suspender);
-    if(fx){
-      fx.suspendida = !fx.suspendida;
-      anotarAuditoria(fx.suspendida ? "Suspendió una fundación" : "Reactivó una fundación",
-                      fx.nombre, "");
-      pintarAdmin();
-      toast(fx.suspendida ? "Fundación suspendida." : "Fundación reactivada.");
-    }
+  if(e.target.closest("#btnAgregarFundacion")) return modalFundacionAdmin(null);
+  if((t = e.target.closest("[data-editar-fundacion]"))){
+    var fEdit = fundacionesAdminCache.filter(function(x){ return x.id === t.dataset.editarFundacion; })[0];
+    if(fEdit) modalFundacionAdmin(fEdit);
+    return;
+  }
+  if((t = e.target.closest("[data-suspender-real]"))){
+    var idSusp = t.dataset.suspenderReal, estaSuspendida = t.dataset.estado === "suspendida";
+    (estaSuspendida ? SyD.fundaciones.reactivar(idSusp) : SyD.fundaciones.suspender(idSusp))
+      .then(function(){
+        toast(estaSuspendida ? "Fundación reactivada." : "Fundación suspendida.");
+        pintarAdmin();
+      })
+      .catch(function(err){ toast(err.message); });
     return;
   }
 
@@ -13355,6 +13360,97 @@ function cifrasPlataforma(){
   };
 }
 
+// ── Fundaciones (real, contra el backend) ───────────────────────────────
+// Trae TODAS las fundaciones (activas y suspendidas) y las pinta en la
+// pestaña de admin. Es async porque habla con la API de verdad — por eso
+// pintarAdmin() solo dispara esto y listo, no puede esperar el resultado.
+var fundacionesAdminCache = [];
+async function cargarFundacionesAdmin(caja){
+  var fundaciones;
+  try {
+    fundaciones = await SyD.fundaciones.listarTodas();
+    fundacionesAdminCache = fundaciones;
+  } catch(err) {
+    caja.innerHTML = '<p class="rec-nota">No pudimos cargar las fundaciones: '+esc(err.message)+'</p>';
+    return;
+  }
+  if(adminSeccion !== "fundaciones") return; // se cambió de pestaña mientras cargaba
+
+  caja.innerHTML =
+    '<div class="adm-fund-cab">'+
+      '<p class="rec-nota">Fundaciones dadas de alta en la plataforma.</p>'+
+      '<button class="btn btn--primary btn--sm" id="btnAgregarFundacion">+ Agregar fundación</button>'+
+    '</div>'+
+    (fundaciones.length === 0
+      ? '<div class="empty">Todavía no hay ninguna fundación cargada.</div>'
+      : fundaciones.map(function(f){
+          var suspendida = f.activa === false;
+          return '<div class="adm-fund'+(suspendida?' es-suspendida':'')+'">'+
+            '<span class="adm-fund__av"'+(f.logoUrl?' style="background-image:url('+esc(f.logoUrl)+')"':'')+'>'+
+              (f.logoUrl ? '' : esc(iniciales(f.nombre)))+'</span>'+
+            '<span class="adm-fund__t"><b>'+esc(f.nombre)+'</b>'+
+              '<span>'+esc(f.linkPago || "Sin link de pago cargado")+'</span>'+
+              '<span class="adm-estado es-'+(suspendida?"suspendida":"activa")+'">'+
+              (suspendida ? "Suspendida" : "Activa")+'</span>'+
+            '</span>'+
+            '<button class="btn btn--ghost btn--sm" data-editar-fundacion="'+f.id+'">Editar</button>'+
+            '<button class="btn btn--ghost btn--sm" data-suspender-real="'+f.id+'" data-estado="'+(suspendida?"suspendida":"activa")+'">'+
+              (suspendida ? "Reactivar" : "Suspender")+'</button>'+
+          '</div>';
+        }).join(""));
+}
+
+// Alta y edición de fundaciones, siempre contra el backend real. `f` es
+// la fundación a editar, o null/undefined para dar de alta una nueva.
+function modalFundacionAdmin(f){
+  var esNueva = !f;
+  abrirModal({
+    eyebrow: esNueva ? "Nueva fundación" : "Editar fundación",
+    titulo: esNueva ? "Agregar fundación" : f.nombre,
+    ancho: "grande",
+    body:
+      campo("mfNombre","Nombre","text","") +
+      campo("mfDescripcion","Descripción","textarea","") +
+      campo("mfLogo","URL del logo (opcional)","text","https://…") +
+      campo("mfLink","Link de pago (obligatorio)","text","https://link.mercadopago.com.ar/…") +
+      campo("mfMail","Mail de contacto (opcional)","email","") +
+      campo("mfTelefono","Teléfono de contacto (opcional)","text",""),
+    ok: esNueva ? "Crear fundación" : "Guardar cambios",
+    after:function(){
+      if(f){
+        $("#mfNombre").value = f.nombre || "";
+        $("#mfDescripcion").value = f.descripcion || "";
+        $("#mfLogo").value = f.logoUrl || "";
+        $("#mfLink").value = f.linkPago || "";
+        $("#mfMail").value = f.contactoEmail || "";
+        $("#mfTelefono").value = f.contactoTelefono || "";
+      }
+    },
+    onOk:async function(){
+      var nombre = val("mfNombre"), link = val("mfLink");
+      if(!nombre){ toast("Ponele un nombre a la fundación."); return; }
+      if(!link){ toast("El link de pago es obligatorio — es adonde va la plata de las donaciones."); return; }
+      var datos = {
+        nombre: nombre,
+        linkPago: link,
+        descripcion: val("mfDescripcion") || undefined,
+        logoUrl: val("mfLogo") || undefined,
+        contactoEmail: val("mfMail") || undefined,
+        contactoTelefono: val("mfTelefono") || undefined,
+      };
+      try {
+        if(esNueva) await SyD.fundaciones.crear(datos);
+        else await SyD.fundaciones.editar(f.id, datos);
+        cerrarModal();
+        toast(esNueva ? "Fundación creada." : "Fundación actualizada.");
+        pintarAdmin();
+      } catch(err) {
+        toast(err.message);
+      }
+    }
+  });
+}
+
 function pintarAdmin(){
   var caja = $("#adminCuerpo"), tabs = $("#adminTabs");
   if(!caja || !tabs) return;
@@ -13558,24 +13654,8 @@ function pintarAdmin(){
   }
 
   if(adminSeccion === "fundaciones"){
-    caja.innerHTML =
-      '<p class="rec-nota">Estado de cada organización en la plataforma.</p>'+
-      d.fundaciones.map(function(f){
-        var total = d.donaciones.filter(function(x){ return x.fid === f.id; })
-          .reduce(function(n,x){ return n + (x.monto||0); }, 0);
-        var suspendida = !!f.suspendida;
-        return '<div class="adm-fund'+(suspendida?' es-suspendida':'')+'">'+
-          '<span class="adm-fund__av"'+(f.foto?' style="background-image:url('+f.foto+')"':'')+'>'+
-            (f.foto ? '' : esc(iniciales(f.nombre)))+'</span>'+
-          '<span class="adm-fund__t"><b>'+esc(f.nombre)+'</b>'+
-            '<span>'+esc(f.lugar||"")+' · '+pesos(total)+' recibidos</span>'+
-            '<span class="adm-estado es-'+(suspendida?"suspendida":"activa")+'">'+
-            (suspendida ? "Suspendida" : (f.verificada ? "Verificada" : "Sin verificar"))+'</span>'+
-          '</span>'+
-          '<button class="btn btn--ghost btn--sm" data-suspender="'+f.id+'">'+
-            (suspendida ? "Reactivar" : "Suspender")+'</button>'+
-        '</div>';
-      }).join("");
+    caja.innerHTML = '<p class="rec-nota">Cargando fundaciones…</p>';
+    cargarFundacionesAdmin(caja);
     return;
   }
 
