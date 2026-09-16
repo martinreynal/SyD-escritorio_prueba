@@ -191,18 +191,29 @@
     ofertar: function (id, monto) {
       return post("/subastas/" + id + "/ofertas", { monto: monto });
     },
-    // Se suscribe a las pujas nuevas de una subasta en tiempo real. Devuelve
-    // una función para cancelar la suscripción cuando se cierra la pantalla.
+    // Programadas pero todavía sin abrir: se ven, pero no se puede ofertar.
+    proximas: function () {
+      return get("/subastas/proximas");
+    },
+    // Admin: las que ya cerraron, con quién ganó y cómo contactarlo. El
+    // cliente definió que al cerrar una subasta el administrador llama
+    // directo al ganador, así que lo que hace falta es ver a quién llamar.
+    finalizadas: function () {
+      return get("/subastas/admin/finalizadas");
+    },
+    // Se suscribe a las ofertas nuevas en tiempo real. Con `subastaId` escucha
+    // una sola subasta; sin él, todas — que es lo que necesita la pantalla del
+    // listado, donde hay varias a la vez. Devuelve una función para cortar la
+    // suscripción cuando se cierra la pantalla: si no, quedan conexiones
+    // abiertas cada vez que se entra y se sale.
     escucharOfertas: function (subastaId, callback) {
+      var filtro = { event: "INSERT", schema: "public", table: "ofertas" };
+      if (subastaId) filtro.filter = "subastaId=eq." + subastaId;
       var canal = sb
-        .channel("ofertas-" + subastaId)
-        .on(
-          "postgres_changes",
-          { event: "INSERT", schema: "public", table: "ofertas", filter: "subastaId=eq." + subastaId },
-          function (payload) {
-            callback(payload.new);
-          }
-        )
+        .channel("ofertas-" + (subastaId || "todas"))
+        .on("postgres_changes", filtro, function (payload) {
+          callback(payload.new);
+        })
         .subscribe();
       return function cancelar() {
         sb.removeChannel(canal);

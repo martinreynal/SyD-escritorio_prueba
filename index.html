@@ -7841,14 +7841,27 @@ function tarjetaPorSubastar(x){
               (f.foto ? '' : esc(iniciales(f.nombre)))+'</span>'+
             '<span><i>A beneficio de</i>'+esc(f.nombre)+'</span></div>'
         : '')+
-      '<p class="lote__aviso">La subasta abre cuando la plataforma la habilite. '+
-        'Vas a recibir un aviso cuando puedas ofertar.</p>'+
+      '<p class="lote__aviso">'+
+        (x.desdeISO
+          ? 'La subasta abre el '+fechaCorta(x.desdeISO)+'.'
+          : 'La subasta abre cuando la plataforma la habilite.')+'</p>'+
     '</div>'+
   '</article>';
 }
 
 function pintarSubastas(){
-  var abiertas = DB.solicitudes.filter(function(x){ return x.estado === "por subastar"; });
+  // Las que ya tienen fecha de salida pero todavía no abrieron. Se llevan a la
+  // forma que espera la tarjeta, igual que en el listado de subastas activas.
+  var abiertas = subastasProximas.map(function(s){
+    return {
+      id: s.id,
+      titulo: s.titulo,
+      fid: s.fundacionId,
+      valor: Number(s.precioInicial),
+      desdeISO: s.fechaInicio,
+      foto: s.fotoUrl || null
+    };
+  });
   var cont = $("#listaSubastas"), nav = $("#subastasNav");   // el paginador puede no existir
   if(!abiertas.length){
     cont.innerHTML = '<div class="empty">No hay sueños esperando salir a subasta.</div>';
@@ -8589,16 +8602,20 @@ function pintarDatosMenu(){
   // que antes, en escritorio el número se agranda solo.
   function ponerN(id, n, txt){ var e = $("#"+id); if(!e) return;
     e.innerHTML = '<span class="dato__n">'+n+'</span><span class="dato__t"> '+txt+'</span>'; }
-  // Cada entrada cuenta lo suyo: en subasta son los sueños con reloj corriendo,
-  // por subastar los que la administración ya aprobó y todavía no abrió.
-  var subastas = DB.solicitudes.filter(function(x){ return x.estado === "en subasta"; }).length;
-  var lotes = DB.solicitudes.filter(function(x){ return x.estado === "por subastar"; }).length;
-  var eventos = DB.fundaciones.reduce(function(n,f){ return n + ((f.eventos||[]).length); }, 0);
+  // Cada entrada cuenta lo suyo, y las cuatro cuentan datos reales: en subasta
+  // son las que tienen el reloj corriendo, por subastar las que ya tienen
+  // fecha de salida pero todavía no abrieron. Los sueños que esperan revisión
+  // o pago no se cuentan: no son públicos.
+  var subastas = subastasReales.length;
+  var lotes = subastasProximas.length;
+  var eventos = eventosReales.length;
 
   poner("datoSuenos", "Contanos tu sueño");
   ponerN("datoSubastas", subastas, subastas===1 ? "sueño en juego" : "sueños en juego");
   ponerN("datoLotes", lotes, lotes===1 ? "sueño esperando" : "sueños esperando");
+  pie("datoLotes", lotes ? "Aprobados, con fecha de salida" : "");
   // Una línea más de contexto donde hay un dato cierto que dar.
+  // (declarada arriba de su primer uso por claridad)
   function pie(id, txt){
     var e = $("#"+id); if(!e) return;
     var p = e.parentNode.querySelector(".dato__pie");
@@ -8606,12 +8623,10 @@ function pintarDatosMenu(){
     if(!p){ p = document.createElement("span"); p.className = "dato__pie"; e.insertAdjacentElement("afterend", p); }
     p.textContent = txt;
   }
-  pie("datoLotes", lotes ? "Aprobados, a la espera de salir" : "");
   ponerN("datoEventos", eventos, eventos===1 ? "actividad próxima" : "actividades próximas");
-  var prox = null;
-  DB.fundaciones.forEach(function(f){ (f.eventos||[]).forEach(function(e){ if(!prox && e.f) prox = e.f; }); });
+  var prox = eventosReales.length ? eventosReales[0].e.f : null;
   pie("datoEventos", prox ? "La próxima · "+prox : "");
-  ponerN("datoFund", DB.fundaciones.length, "fundaciones verificadas");
+  ponerN("datoFund", fundacionesDonacion.length, "fundaciones publicadas");
 }
 
 function revisarMenuFijo(){
@@ -10619,6 +10634,30 @@ function modalPublicarSueno(){
 }
 
 /* ---- listado de deseos ---- */
+// Mientras la pantalla de subastas está abierta se escuchan las ofertas
+// nuevas en vivo: es el requisito del PDF de que, si alguien oferta mientras
+// otro está mirando, se actualice en el momento sin recargar.
+var cortarEscuchaOfertas = null;
+
+function escucharOfertasEnVivo(){
+  if(cortarEscuchaOfertas) return;           // ya estaba escuchando
+  try {
+    cortarEscuchaOfertas = SyD.subastas.escucharOfertas(null, function(){
+      // Llega solo el aviso de que hubo una oferta nueva; se vuelve a pedir
+      // el listado para tener también quién va ganando y cuántas ofertas van.
+      cargarSubastasReales();
+    });
+  } catch(err) {
+    cortarEscuchaOfertas = null;             // sin tiempo real igual funciona
+  }
+}
+
+function dejarDeEscucharOfertas(){
+  if(!cortarEscuchaOfertas) return;
+  try { cortarEscuchaOfertas(); } catch(err){}
+  cortarEscuchaOfertas = null;
+}
+
 function abrirDeseos(){
   apagarNoche();
   marcarTab("");
@@ -10633,10 +10672,14 @@ function abrirDeseos(){
   setTimeout(acomodarCarruseles, 60);
   setTimeout(acomodarCarruseles, 220);
   window.scrollTo({top:0});
+  // Al entrar se vuelven a pedir: pudo haber cambiado algo desde la carga.
+  cargarSubastasReales();
+  escucharOfertasEnVivo();
 }
 function cerrarDeseos(){
   document.body.classList.remove("sin-scroll");
   $("#screen-deseos").classList.remove("is-active");
+  dejarDeEscucharOfertas();
   if(sesion) $("#screen-app").classList.add("is-active");
   else $("#screen-app").classList.add("is-active");
   revisarCielo();
@@ -10647,6 +10690,51 @@ function cerrarDeseos(){
 // no tocar las llamadas.
 function seguirCarril(){ montarCarriles(); }
 
+// ── Subastas reales ─────────────────────────────────────────────────────
+// Se traen de la API y se las lleva a la forma que ya esperaban las tarjetas
+// de sueño de la maqueta (x.titulo, x.aCambio, x.valor, x.ofertas,
+// x.cierreISO), para no reescribir la tarjeta ni el reloj de cuenta regresiva.
+var subastasReales = [];
+var subastasProximas = [];
+
+async function cargarSubastasReales(){
+  var lista;
+  try {
+    lista = await SyD.subastas.listar();
+    subastasProximas = await SyD.subastas.proximas();
+  } catch(err) {
+    subastasReales = []; subastasProximas = [];
+    return;
+  }
+  subastasReales = lista.map(function(s){
+    var mejor = (s.ofertas || [])[0];
+    var quien = s.subastador
+      ? ((s.subastador.nombre||"")+" "+(s.subastador.apellido||"")).trim()
+      : "";
+    return {
+      id: s.id,
+      titulo: s.titulo,
+      aCambio: s.descripcion || "",
+      foto: s.fotoUrl || null,
+      fid: s.fundacionId,
+      quien: quien,
+      valor: Number(s.precioInicial),
+      incremento: Number(s.incrementoMinimo),
+      cierreISO: s.fechaFin,
+      estado: "en subasta",
+      cuantas: (s._count && s._count.ofertas) || 0,
+      // mejorOferta() toma el último elemento, así que va la más alta sola.
+      ofertas: mejor
+        ? [{ monto: Number(mejor.monto),
+             quien: (mejor.usuario && mejor.usuario.nombre) || "Alguien",
+             anonimo: false }]
+        : []
+    };
+  });
+  try { pintarListaDeseos(); } catch(err){}
+  try { pintarDatosMenu(); } catch(err){}
+}
+
 function pintarListaDeseos(){
   // Una fundación ve sólo los sueños y subastas dirigidos a ella.
   var mia = esFundacion() ? miFundacion() : null;
@@ -10654,7 +10742,7 @@ function pintarListaDeseos(){
   // Esta pantalla es la de las subastas con el reloj corriendo. Los sueños
   // aprobados que todavía no salieron viven en "Sueños por subastar", y los que
   // esperan aprobación no se muestran en ningún lado hasta que pasen.
-  var activas = DB.solicitudes.filter(function(x){ return x.estado === "en subasta"; });
+  var activas = subastasReales;
   var propios = mia
     ? activas.filter(function(x){ return x.fid === mia.id; }).length
     : activas.length;
@@ -10831,7 +10919,7 @@ function modalDeseo(did){
     onOk:function(){
       cerrarModal();
       setTimeout(function(){
-        if(garantiaPaga[did]) modalOfertarSueno(did); else modalGarantia(did);
+        modalOfertarSueno(did);
       }, 260);
     }});
 }
@@ -11573,40 +11661,48 @@ function pagarGarantia(){
   toast("Ofertaste "+pesos(monto)+". La garantía va a "+(f?f.nombre:"la fundación")+".");
 }
 
+// Ofertar, contra la API real. El mínimo lo calcula el backend también, así
+// que acá se valida solo para avisar antes de mandar el pedido: la regla que
+// manda es la de allá, que es la que corre dentro del bloqueo que impide que
+// dos ofertas simultáneas se pisen.
 function modalOfertarSueno(did){
-  var x = DB.solicitudes.filter(function(y){ return y.id===did; })[0];
+  var x = subastasReales.filter(function(y){ return y.id===did; })[0];
   if(!x) return;
   if(!puedeAportar()){ toast("Las fundaciones reciben los sueños, no ofertan."); return; }
 
   var mejor = mejorOferta(x);
-  var minimo = mejor ? mejor.monto + 1000 : (x.valor || 1000);
+  var minimo = mejor ? mejor.monto + (x.incremento || 0) : (x.valor || 0);
 
-  abrirModal({eyebrow:"Quedarte con el deseo", titulo:x.titulo||"Deseo",
-    // Sin autor, igual que la tarjeta de la que se abre este modal.
+  abrirModal({eyebrow:"Cumplir este sueño", titulo:x.titulo||"Sueño",
     sub:(x.valor ? "Salió en "+pesos(x.valor) : ""),
     ancho:"grande",
     body:
       (mejor
         ? '<div class="destino-fijo">'+
-          (mejor.anonimo !== false ? avatarAnonimo() : avatarUsuario(mejor.quien))+
-          '<div><b>'+pesos(mejor.monto)+'</b><span>Va ganando '+
-          (mejor.anonimo !== false ? "un donante anónimo" : esc(mejor.quien))+'</span></div></div>'
-        : '<p class="field__hint" style="margin-bottom:16px">Nadie ofertó todavía: con superar el valor de salida, el deseo es tuyo.</p>')+
+          avatarUsuario(mejor.quien)+
+          '<div><b>'+pesos(mejor.monto)+'</b><span>Va ganando '+esc(mejor.quien)+'</span></div></div>'
+        : '<p class="field__hint" style="margin-bottom:16px">Nadie ofertó todavía: '+
+          'con igualar el valor de salida, el sueño es tuyo.</p>')+
       campoPesos("ofMonto","Tu oferta","")+
-      '<p class="field__hint">Necesitás poner al menos '+pesos(minimo)+' para quedártelo. Lo recaudado va a la fundación.</p>'+
-      historialSueno(x),
+      '<p class="field__hint">Necesitás poner al menos '+pesos(minimo)+
+      '. Lo recaudado va a la fundación.</p>',
     ok:"Confirmar oferta",
-    onOk:function(){
+    onOk:async function(){
       if(!exigirSesion("ofertar")) return;
       var m = valPesos("ofMonto");
       if(!(m >= minimo)){
-        if(!DEMO){ toast("Tu oferta tiene que ser de "+pesos(minimo)+" o más."); return; }
-        m = minimo;   // beta: si no ponés nada, ofertamos el mínimo
+        toast("Tu oferta tiene que ser de "+pesos(minimo)+" o más."); return;
       }
-      x.ofertas = x.ofertas || [];
-      x.ofertas.push({quien:sesion.nombre, monto:m, fecha:hoyISO()});
-      cerrarModal(); pintarTodo();
-      toast("El deseo es tuyo por "+pesos(m)+", hasta que alguien ofrezca más.");
+      try {
+        await SyD.subastas.ofertar(did, m);
+      } catch(err) {
+        toast(err.message);
+        return;
+      }
+      cerrarModal();
+      await cargarSubastasReales();
+      pintarTodo();
+      toast("Tu oferta de "+pesos(m)+" quedó primera, hasta que alguien ofrezca más.");
     }});
 }
 
@@ -13015,6 +13111,7 @@ function mostrarApp(){
   // sesión, en qué punto de la doble confirmación quedó esta persona: al
   // entrar o salir de una cuenta ese dato cambia.
   cargarEventosReales();
+  cargarSubastasReales();
   pintarTodo(); irA(esFundacion() ? 0 : 1); revisarCielo();
   // Si venía de llenar un sueño y tuvo que entrar para publicarlo, vuelve a
   // ese formulario con todo cargado en vez de quedar en la portada.
@@ -13504,7 +13601,11 @@ document.addEventListener("click", function(e){
   if((t = e.target.closest("[data-borrar-sueno]"))) return borrarSueno(t.dataset.borrarSueno);
   if((t = e.target.closest("[data-ofertar-sueno]"))){
     var did = t.dataset.ofertarSueno;
-    return garantiaPaga[did] ? modalOfertarSueno(did) : modalGarantia(did);
+    // Ofertar es un solo paso. La "garantía de subasta" de $10.000 que pedía
+    // la maqueta antes de dejarte ofertar quedó afuera: no está en el pedido
+    // del cliente, y sería un segundo circuito de cobro con comprobante y
+    // verificación, igual de grande que el del fee de $20.000.
+    return modalOfertarSueno(did);
   }
   if((t = e.target.closest("[data-ver-deseo]"))) return modalDeseo(t.dataset.verDeseo);
   if(e.target.closest("#btnAnonimo")) return alternarAnonimo();
@@ -14019,10 +14120,11 @@ function pintarAdmin(){
 // es "acepto o cancelo", no llevar un archivo de rechazos.
 var suenosPendientesCount = 0;
 async function cargarSuenosAdmin(caja){
-  var enProceso, publicados;
+  var enProceso, publicados, terminadas;
   try {
     enProceso = await SyD.suenos.listarEnProceso();
     publicados = await SyD.suenos.listarPublicos();
+    terminadas = await SyD.subastas.finalizadas();
   } catch(err) {
     caja.innerHTML = '<p class="rec-nota">No pudimos cargar los sueños: '+esc(err.message)+'</p>';
     return;
@@ -14099,6 +14201,29 @@ async function cargarSuenosAdmin(caja){
             : '<span class="field__hint">No subió archivo, solo el número de operación.</span>')+
           '<button class="btn btn--primary btn--sm" data-publicar="'+x.id+'">Verificado: publicar</button>'+
           '<button class="btn btn--ghost btn--sm" data-rechazar="'+x.id+'">Rechazar</button>');
+      })+
+
+    // El cliente definió que al cerrar una subasta el admin llama directo al
+    // ganador, así que lo que hace falta acá es ver a quién llamar: los datos
+    // de contacto del que ganó y los del soñador, para ponerlos en contacto.
+    bloque("Terminadas · contactá al ganador", terminadas,
+      "Todavía no cerró ninguna subasta.", function(s){
+        var g = s.ganadora, u = g && g.usuario;
+        var so = (s.sueno || {}).sonador;
+        function contacto(p){
+          if(!p) return "—";
+          return esc(((p.nombre||"")+" "+(p.apellido||"")).trim())+
+            ' · '+esc(p.email||"")+(p.telefono ? ' · '+esc(p.telefono) : ' · sin teléfono');
+        }
+        return '<div class="adm-sueno">'+
+          '<div class="adm-sueno__t"><b>'+esc(s.titulo)+'</b>'+
+            '<span class="adm-estado es-rechazado">Cerró el '+fechaCorta(s.fechaFin)+'</span></div>'+
+          (g
+            ? '<p class="adm-sueno__m">Ganó con '+pesos(Number(g.monto))+'</p>'+
+              '<p class="adm-sueno__q"><b>Ganador:</b> '+contacto(u)+'</p>'
+            : '<p class="adm-sueno__m">Cerró sin ofertas.</p>')+
+          '<p class="adm-sueno__q"><b>Soñador:</b> '+contacto(so)+'</p>'+
+        '</div>';
       })+
 
     bloque("En subasta", publicados, "No hay subastas abiertas.", function(x){
@@ -14438,7 +14563,11 @@ SyD.auth.onCambioDeSesion(function(sesionSb){
 // Cierre: se vuelve a fijar la pestaña del menú y se remide, ya con todo
 // dibujado. Sin esto, el primer reparto queda hecho sobre medidas a medio
 // asentar y el menú puede aparecer descolocado.
+// Los datos públicos se cargan al arrancar, no al entrar con una cuenta: la
+// web se navega sin sesión, y el administrador tampoco pasa por mostrarApp().
 fundacionesListas = cargarFundacionesReales();
+cargarSubastasReales();
+cargarEventosReales();
 try { irA(1); } catch(err){}
 try { revisarMenuFijo(); } catch(err){}
 document.body.classList.add("app-lista");
