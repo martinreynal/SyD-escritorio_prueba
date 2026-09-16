@@ -7545,17 +7545,84 @@ var carEventos = crearCarrusel({
   render:function(ev){ return tarjetaEvento(ev); }
 });
 
-function proximosEventos(){
-  var lista = [];
-  DB.fundaciones.forEach(function(f){
-    (f.eventos||[]).forEach(function(e){ lista.push({e:e, f:f}); });
+// ── Eventos reales ──────────────────────────────────────────────────────
+// Se traen de la API y se los lleva a la forma que ya esperaban las
+// pantallas de eventos de la maqueta (e.n, e.f, e.lugar, e.desc, e.fISO),
+// para no reescribir las tarjetas, los filtros ni el buscador.
+var eventosReales = [];
+
+function fechaLargaEvento(iso){
+  var d = new Date(iso);
+  if(isNaN(d)) return "";
+  return d.getDate()+" de "+MESES_NOM[d.getMonth()];
+}
+
+async function cargarEventosReales(){
+  var lista;
+  try {
+    lista = await SyD.eventos.listar();
+  } catch(err) {
+    eventosReales = [];
+    return;
+  }
+  eventosReales = lista.map(function(ev){
+    var f = fundacionPorId(ev.fundacionId) || {
+      id: ev.fundacionId,
+      nombre: (ev.fundacion||{}).nombre || "",
+      foto: (ev.fundacion||{}).logoUrl || null,
+      color: "#87CEEB"
+    };
+    return { f: f, e: {
+      id: ev.id,
+      n: ev.titulo,
+      desc: ev.descripcion || "",
+      lugar: ev.lugar || "",
+      imagen: ev.fotoUrl || null,
+      fISO: ev.fecha,
+      f: fechaLargaEvento(ev.fecha),
+      requierePago: !!ev.requierePago,
+      montoEntrada: ev.montoEntrada,
+      // La tarjeta muestra este texto tal cual, y "Gratis" si viene vacío.
+      precio: ev.requierePago
+        ? (ev.montoEntrada ? pesos(Number(ev.montoEntrada)) : "Con entrada")
+        : "",
+      miAsistencia: ev.miAsistencia || null
+    }};
   });
-  return lista;
+  try { pintarEventos(); } catch(err){}
+}
+
+function proximosEventos(){ return eventosReales.slice(); }
+
+// En qué punto de la doble confirmación quedó esta persona para este evento.
+function estadoAsistencia(e){
+  var a = e && e.miAsistencia;
+  if(!a || !a.confirmadaEn) return "ninguna";
+  if(!a.reconfirmadaEn) return "a-medias";
+  return "confirmada";
+}
+
+// La forma de cobro de una fundación puede ser un link, un alias o un CBU
+// (el cliente pidió que quede abierto). Solo tiene sentido abrir una pestaña
+// si es un link; si no, se muestran los datos para copiar.
+function esLink(v){ return /^https?:\/\//i.test(String(v||"")); }
+
+function abrirFormaDeCobro(valor, para){
+  if(!valor) return false;
+  if(esLink(valor)){ window.open(valor, "_blank", "noopener"); return true; }
+  abrirModal({eyebrow:"Pago", titulo:"Cómo completar el pago",
+    sub: para ? "Datos de "+para : "",
+    body:'<p class="field__hint">Copiá estos datos y hacé la transferencia desde tu banco o billetera. '+
+         'Soñá y Doná nunca recibe ni retiene ese dinero.</p>'+
+         '<p style="font-size:18px;font-weight:700;word-break:break-all;margin-top:12px">'+esc(valor)+'</p>',
+    ok:"Listo",
+    onOk:function(){ cerrarModal(); }});
+  return true;
 }
 
 function tarjetaEvento(it){
   var e = it.e, f = it.f;
-  var voy = sesion && (e.asistentes||[]).indexOf(sesion.nombre) > -1;
+  var voy = sesion && estadoAsistencia(e) === "confirmada";
   return '<article class="ecard">'+
     '<div class="ecard__img" style="'+(e.imagen?'background-image:url('+e.imagen+')':'')+'"></div>'+
     '<div class="ecard__body">'+
@@ -7599,7 +7666,7 @@ function eventosFiltrados(){
     var e = it.e, f = it.f, fe = fechaEvento(e);
     if(evEstado.filtro === "semana" && !(fe && fe.t - ahora < 7 * 86400000)) return false;
     if(evEstado.filtro === "mes" && !(fe && new Date(fe.t).getMonth() === new Date().getMonth())) return false;
-    if(evEstado.filtro === "mios" && !(sesion && (e.asistentes||[]).indexOf(sesion.nombre) > -1)) return false;
+    if(evEstado.filtro === "mios" && !(sesion && estadoAsistencia(e) !== "ninguna")) return false;
     if(evEstado.lugar && (e.lugar||"").indexOf(evEstado.lugar) < 0) return false;
     if(q && [e.n, e.lugar, e.desc, f.nombre].join(" ").toLowerCase().indexOf(q) < 0) return false;
     return true;
@@ -7629,7 +7696,7 @@ function opcionesLugarEvento(){
 
 function tarjetaEvento(it){
   var e = it.e, f = it.f;
-  var voy = sesion && (e.asistentes||[]).indexOf(sesion.nombre) > -1;
+  var voy = sesion && estadoAsistencia(e) === "confirmada";
   var fe = fechaEvento(e);
   var lugarCorto = (e.lugar || "").split(",").slice(-2).join(",").trim();
   return '<article class="ecard ev-card" data-evento-mas="' + e.id + '" data-fid="' + f.id + '" tabindex="0" role="button">' +
@@ -9037,7 +9104,7 @@ function bloquePresentacion(f){
     videoEmbed(p.video);
 }
 function bloqueEvento(e, fid, editable){
-  var voy = sesion && (e.asistentes||[]).indexOf(sesion.nombre) > -1;
+  var voy = sesion && estadoAsistencia(e) === "confirmada";
   return '<article class="bloque">'+
     '<div class="bloque__img" style="'+(e.imagen?'background-image:url('+e.imagen+')':'')+'"></div>'+
     '<div class="bloque__body"><div class="bloque__fecha">'+esc(e.f)+'</div>'+
@@ -9430,7 +9497,7 @@ function cifraPerfil(ico, valor, rotulo){
 
 // Tarjeta de evento dentro del perfil: foto al costado y las dos acciones.
 function tarjetaEventoPerfil(e, f){
-  var voy = sesion && (e.asistentes||[]).indexOf(sesion.nombre) > -1;
+  var voy = sesion && estadoAsistencia(e) === "confirmada";
   return '<article class="fp-ev">'+
     '<div class="fp-ev__foto"'+(e.imagen ? ' style="background-image:url('+e.imagen+')"' : '')+'></div>'+
     '<div class="fp-ev__c">'+
@@ -9884,6 +9951,14 @@ function abrirEventos(){
 // "2026-03-01" → "marzo". Si no hay fecha, decimos que es reciente.
 // Fecha corta y exacta, como 3/7/26. El historial la prefiere al mes suelto:
 // para reconocer una donación propia, el día importa.
+// Una fecha suelta ("2026-10-24") se interpreta como medianoche UTC, que en
+// Argentina es el día ANTERIOR a las 21hs: el evento cargado para el 24
+// aparecía como 23. Se manda al mediodía local, que cae en el mismo día en
+// cualquier huso razonable. Es el mismo truco que usa fechaCorta al leer.
+function fechaAlMediodia(valor){
+  return valor && valor.length <= 10 ? valor + "T12:00" : valor;
+}
+
 function fechaCorta(f){
   if(!f) return "";
   var d = new Date(String(f).length <= 10 ? f + "T12:00" : f);
@@ -12518,17 +12593,22 @@ function modalEditarEvento(eid){
 }
 
 function modalEventoMas(eid, fid){
-  var f = fundacionPorId(fid); if(!f) return;
-  var e = f.eventos.filter(function(x){ return x.id===eid; })[0]; if(!e) return;
-  // Como fundación, "Conocer más" sirve para cargar el link del evento.
-  if(esFundacion() && sesion.fid === fid) return modalLinkEvento(e, f);
-  var voy = sesion && (e.asistentes||[]).indexOf(sesion.nombre) > -1;
+  var it = eventosReales.filter(function(x){ return x.e.id === eid; })[0];
+  if(!it) return;
+  var e = it.e, f = it.f;
+  var estado = estadoAsistencia(e);
   abrirModal({eyebrow:f.nombre+" · "+e.f, titulo:e.n, sub:e.lugar,
     body:(e.imagen ? '<img src="'+e.imagen+'" alt="" style="width:100%;height:auto;max-height:280px;object-fit:contain;border-radius:14px;background:var(--nube);margin-bottom:18px">' : '')+
       (e.desc ? '<p class="presentacion__texto" style="font-size:15px">'+esc(e.desc)+'</p>' : '<p class="field__hint">Sin descripción cargada.</p>')+
-      (e.link ? '<p style="margin-top:14px"><a class="contacto__link" href="'+esc(e.link)+'" target="_blank" rel="noopener">Ir a la página del evento &rarr;</a></p>' : '')+
-      '<p class="field__hint" style="margin-top:16px">'+(e.asistentes||[]).length+' personas confirmaron asistencia.</p>',
-    ok: voy ? "Asistencia confirmada" : "Confirmar asistencia",
+      (e.requierePago
+        ? '<p class="field__hint" style="margin-top:14px">Entrada'+
+          (e.montoEntrada ? ' de '+pesos(Number(e.montoEntrada)) : '')+
+          ', que se le paga directo a '+esc(f.nombre)+'.</p>'
+        : '<p class="field__hint" style="margin-top:14px">Actividad sin costo de entrada.</p>')+
+      (estado === "a-medias"
+        ? '<p class="field__hint" style="margin-top:10px">Empezaste a anotarte pero te falta confirmar.</p>'
+        : ''),
+    ok: estado === "confirmada" ? false : "Confirmar asistencia",
     onOk:function(){ cerrarModal(); alternarAsistencia(eid, fid); }});
 }
 
@@ -12549,20 +12629,75 @@ function modalLinkEvento(e, f){
     }});
 }
 
-function alternarAsistencia(eid, fid){
+// Doble confirmación, tal como la pidió el cliente: el primer clic anota la
+// intención, y enseguida sale un cartel que pide confirmar de nuevo. Recién
+// después de ese segundo paso se paga la entrada (si el evento tiene costo)
+// o se queda anotado para participar.
+//
+// Los dos pasos se guardan por separado en el backend (confirmadaEn y
+// reconfirmadaEn), así la fundación puede distinguir a quien tocó de paso de
+// quien confirmó en serio — que es para lo que sirve pedirlo dos veces.
+async function alternarAsistencia(eid, fid){
   if(!exigirSesion("anotarte al evento")) return;
   if(!puedeAportar()){ toast("Las fundaciones organizan los eventos, no se anotan."); return; }
-  var f = fundacionPorId(fid); if(!f) return;
-  var e = f.eventos.filter(function(x){ return x.id===eid; })[0]; if(!e) return;
-  e.asistentes = e.asistentes || [];
-  var i = e.asistentes.indexOf(sesion.nombre);
-  if(i > -1){ e.asistentes.splice(i,1); toast("Cancelaste tu asistencia a "+e.n+"."); }
-  else {
-    e.asistentes.push(sesion.nombre);
-    // Beta: la confirmación es simulada, no se envía nada.
-    toast("Asistencia confirmada a "+e.n+".");
+  var it = eventosReales.filter(function(x){ return x.e.id === eid; })[0];
+  if(!it) return;
+  var e = it.e;
+
+  if(estadoAsistencia(e) === "confirmada"){
+    toast("Ya confirmaste tu asistencia a "+e.n+".");
+    return;
   }
-  pintarTodo();
+
+  // Si ya había dado el primer paso antes, no se repite: se va derecho al
+  // cartel de reconfirmación.
+  if(estadoAsistencia(e) === "ninguna"){
+    try {
+      var a = await SyD.eventos.confirmarAsistencia(eid);
+      e.miAsistencia = {confirmadaEn:a.confirmadaEn, reconfirmadaEn:a.reconfirmadaEn};
+    } catch(err) {
+      toast(err.message);
+      return;
+    }
+  }
+  pedirReconfirmacion(it);
+}
+
+function pedirReconfirmacion(it){
+  var e = it.e, f = it.f;
+  abrirModal({
+    eyebrow:"Un paso más", titulo:"¿Confirmás que vas?",
+    sub: e.n + (e.lugar ? " · "+e.lugar : ""),
+    body:'<p class="field__hint">'+
+      (e.requierePago
+        ? "La fundación cuenta con vos para organizar. Al confirmar te llevamos a pagar tu entrada"+
+          (e.montoEntrada ? " de "+pesos(Number(e.montoEntrada)) : "")+", que va directo a "+esc(f.nombre)+"."
+        : "La fundación cuenta con vos para organizar. Al confirmar quedás anotado para participar.")+
+      '</p>',
+    ok:"Sí, confirmo",
+    cancelar:"Todavía no",
+    onOk:async function(){
+      var r;
+      try {
+        r = await SyD.eventos.reconfirmarAsistencia(e.id);
+      } catch(err) {
+        toast(err.message);
+        return;
+      }
+      e.miAsistencia = {confirmadaEn:r.asistencia.confirmadaEn, reconfirmadaEn:r.asistencia.reconfirmadaEn};
+      cerrarModal();
+      pintarTodo();
+      if(r.siguientePaso === "PAGAR"){
+        if(abrirFormaDeCobro(r.linkPago, f.nombre)){
+          toast("Confirmado. Completá el pago de la entrada.");
+        } else {
+          toast("Confirmado. La fundación todavía no cargó cómo cobrar la entrada — te van a contactar.");
+        }
+      } else {
+        toast("Listo, quedaste anotado a "+e.n+".");
+      }
+    }
+  });
 }
 
 /* ==================== pantallas de alta ==================== */
@@ -12843,6 +12978,10 @@ function mostrarApp(){
   document.body.classList.remove("portada");
   $$(".screen").forEach(function(sc){ sc.classList.remove("is-active"); });
   $("#screen-app").classList.add("is-active");
+  // Se recargan acá y no solo al arrancar porque el listado trae, si hay
+  // sesión, en qué punto de la doble confirmación quedó esta persona: al
+  // entrar o salir de una cuenta ese dato cambia.
+  cargarEventosReales();
   pintarTodo(); irA(esFundacion() ? 0 : 1); revisarCielo();
 }
 function abrirLogin(){
@@ -13212,6 +13351,7 @@ document.addEventListener("click", function(e){
   }
   if(e.target.closest("#adminSalir")) return salirDeAdmin();
   if(e.target.closest("#btnAgregarFundacion")) return modalFundacionAdmin(null);
+  if(e.target.closest("#btnAgregarEvento")) return modalEventoAdmin();
   if((t = e.target.closest("[data-editar-fundacion]"))){
     var fEdit = fundacionesAdminCache.filter(function(x){ return x.id === t.dataset.editarFundacion; })[0];
     if(fEdit) modalFundacionAdmin(fEdit);
@@ -13562,6 +13702,106 @@ async function cargarFundacionesAdmin(caja){
         }).join(""));
 }
 
+// ── Panel de administración: eventos ────────────────────────────────────
+// Esta pantalla no estaba en la maqueta ni en el pedido original: se armó
+// porque el requerimiento de "actividades y eventos solidarios" no puede
+// existir si no hay forma de cargar un evento. Queda al mínimo: dar de alta
+// y ver los próximos.
+async function cargarEventosAdmin(caja){
+  var eventos;
+  try {
+    eventos = await SyD.eventos.listar();
+  } catch(err) {
+    caja.innerHTML = '<p class="rec-nota">No pudimos cargar los eventos: '+esc(err.message)+'</p>';
+    return;
+  }
+  if(adminSeccion !== "eventos") return; // se cambió de pestaña mientras cargaba
+
+  caja.innerHTML =
+    '<div class="adm-fund-cab">'+
+      '<p class="rec-nota">Actividades y eventos solidarios que todavía no pasaron.</p>'+
+      '<button class="btn btn--primary btn--sm" id="btnAgregarEvento">+ Agregar evento</button>'+
+    '</div>'+
+    (eventos.length === 0
+      ? '<div class="empty">Todavía no hay ningún evento cargado.</div>'
+      : eventos.map(function(e){
+          return '<div class="adm-fund">'+
+            '<span class="adm-fund__av"'+(e.fotoUrl?' style="background-image:url('+esc(e.fotoUrl)+')"':'')+'>'+
+              (e.fotoUrl ? '' : esc(iniciales(e.titulo)))+'</span>'+
+            '<span class="adm-fund__t"><b>'+esc(e.titulo)+'</b>'+
+              '<span>'+fechaCorta(e.fecha)+(e.lugar ? ' · '+esc(e.lugar) : '')+'</span>'+
+              '<span>'+esc((e.fundacion||{}).nombre || "")+'</span>'+
+              (e.requierePago
+                ? '<span class="adm-estado es-pendiente">Con entrada'+
+                  (e.montoEntrada ? ' · '+pesos(Number(e.montoEntrada)) : '')+'</span>'
+                : '<span class="adm-estado es-activa">Gratis</span>')+
+            '</span>'+
+          '</div>';
+        }).join(""));
+}
+
+function modalEventoAdmin(){
+  // Los eventos los organiza una fundación, de cualquiera de las dos ramas.
+  var todas = fundacionesDonacion.concat(fundacionesSubasta.filter(function(f){
+    return !fundacionesDonacion.some(function(d){ return d.id === f.id; });
+  }));
+  if(!todas.length){
+    toast("Primero cargá una fundación: un evento siempre lo organiza una.");
+    return;
+  }
+
+  abrirModal({
+    eyebrow:"Nuevo evento", titulo:"Agregar evento",
+    ancho:"grande",
+    body:
+      '<div class="field"><label for="meFund">Fundación que lo organiza</label>'+
+        '<select id="meFund">'+
+        todas.map(function(f){ return '<option value="'+f.id+'">'+esc(f.nombre)+'</option>'; }).join("")+
+        '</select></div>'+
+      campo("meTitulo","Nombre del evento","text","")+
+      '<div class="field"><label for="meDesc">Descripción</label>'+
+        '<textarea id="meDesc" class="caja-grande" placeholder="Qué es, para qué es, quién puede ir."></textarea></div>'+
+      campo("meFecha","Fecha","date","")+
+      campo("meLugar","Lugar (opcional)","text","Dirección o sede")+
+      campo("meFoto","URL de la foto (opcional)","text","https://…")+
+      '<label class="check"><input type="checkbox" id="mePago"> El evento tiene un costo de entrada</label>'+
+      campoPesos("meMonto","Valor de la entrada","")+
+      campo("meLink","Cómo se le paga a la fundación","text","Link de pago, alias o CBU",
+        '<p class="field__hint">Obligatorio si el evento tiene costo. La plata va directo a la fundación.</p>'),
+    ok:"Crear evento",
+    onOk:async function(){
+      var titulo = val("meTitulo"), desc = val("meDesc"), fecha = $("#meFecha").value;
+      var pago = $("#mePago").checked, monto = valPesos("meMonto"), link = val("meLink");
+      if(!titulo){ toast("Ponele un nombre al evento."); return; }
+      if(desc.length < 5){ toast("Contá un poco de qué se trata el evento."); return; }
+      if(!fecha){ toast("Poné la fecha del evento."); return; }
+      // Mismas reglas que valida el backend, para avisar antes de mandar.
+      if(pago && !link){
+        toast("Si el evento tiene costo, hace falta cargar cómo se le paga a la fundación."); return;
+      }
+      try {
+        await SyD.eventos.crear({
+          fundacionId: $("#meFund").value,
+          titulo: titulo,
+          descripcion: desc,
+          fecha: fechaAlMediodia(fecha),
+          lugar: val("meLugar") || undefined,
+          fotoUrl: val("meFoto") || undefined,
+          requierePago: pago,
+          montoEntrada: pago && monto > 0 ? monto : undefined,
+          linkPago: pago ? link : undefined
+        });
+        cerrarModal();
+        toast("Evento creado.");
+        pintarAdmin();
+        cargarEventosReales();
+      } catch(err) {
+        toast(err.message);
+      }
+    }
+  });
+}
+
 // Alta y edición de fundaciones, siempre contra el backend real. `f` es
 // la fundación a editar, o null/undefined para dar de alta una nueva.
 function modalFundacionAdmin(f){
@@ -13656,6 +13896,7 @@ function pintarTabsAdmin(){
     ["solicitudes", "Solicitudes", solicitudesFundacionPendientesCount],
     ["usuarios", "Usuarios", 0],
     ["fundaciones", "Fundaciones", 0],
+    ["eventos", "Eventos", 0],
     ["auditoria", "Auditoría", 0]
   ];
   tabs.innerHTML = secciones.map(function(sx){
@@ -13692,6 +13933,12 @@ function pintarAdmin(){
   if(adminSeccion === "fundaciones"){
     caja.innerHTML = '<p class="rec-nota">Cargando fundaciones…</p>';
     cargarFundacionesAdmin(caja);
+    return;
+  }
+
+  if(adminSeccion === "eventos"){
+    caja.innerHTML = '<p class="rec-nota">Cargando eventos…</p>';
+    cargarEventosAdmin(caja);
     return;
   }
 
@@ -13832,8 +14079,8 @@ function aprobarSueno(id){
       }
       try {
         await SyD.suenos.aprobar(id, {
-          fechaInicio: desde,
-          fechaFin: hasta,
+          fechaInicio: fechaAlMediodia(desde),
+          fechaFin: fechaAlMediodia(hasta),
           precioInicial: base,
           incrementoMinimo: inc > 0 ? inc : undefined,
         });
