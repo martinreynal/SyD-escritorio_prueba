@@ -6896,9 +6896,26 @@ function miFundacion(){ return esFundacion() ? DB.fundaciones.filter(function(f)
 // alimentan las pantallas que no están en el pedido del cliente.
 var fundacionesDonacion = [], fundacionesSubasta = [];
 
+// Las fundaciones reales tienen mucho menos datos que las de la maqueta:
+// nombre, descripción, logo y forma de cobro. Esto las lleva a la forma que
+// esperan las pantallas del front, con las listas en vacío en vez de datos
+// inventados. Se conservan también los campos tal como los devuelve la API,
+// porque algunas pantallas los usan con ese nombre.
 function normalizarFundacion(f){
-  // El resto del front espera `foto`; la API devuelve `logoUrl`.
-  f.foto = f.logoUrl || "";
+  f.foto = f.logoUrl || null;
+  f.lema = f.descripcion || "";
+  f.lugar = "";
+  f.aQuien = "";
+  f.texto = "";
+  f.color = "#87CEEB";
+  f.banner = null;
+  f.verificada = true;
+  f.desde = null;
+  f.web = "";
+  f.aporteGeneral = 0;
+  f.presentacion = {texto:"", imagenes:[], video:""};
+  f.causas = []; f.eventos = []; f.colabs = []; f.planes = [];
+  f.direccion = ""; f.maps = ""; f.cuit = ""; f.personeria = ""; f.inscripta = "";
   return f;
 }
 
@@ -6910,6 +6927,7 @@ async function cargarFundacionesReales(){
     ]);
     fundacionesDonacion = r[0].map(normalizarFundacion);
     fundacionesSubasta = r[1].map(normalizarFundacion);
+    try { pintarFundaciones(); } catch(err){}
   } catch(err) {
     // Si el backend no responde, las pantallas que dependen de esto avisan
     // por su cuenta. No rompemos el resto de la página por eso.
@@ -7322,7 +7340,9 @@ function alternarFavorita(fid){
 // causa y lema, igual que las sugerencias de acceso rápido.
 function fundacionesFiltradas(){
   var q = (fxEstado.q||"").trim().toLowerCase();
-  return DB.fundaciones.filter(function(f){
+  // Esta es "la parte de donar": muestra las fundaciones que el admin
+  // publicó en la rama de Donaciones, no las de la maqueta.
+  return fundacionesDonacion.filter(function(f){
     if(fxEstado.solofav && !esFavorita(f.id)) return false;
     if(fxEstado.lugar && f.lugar !== fxEstado.lugar) return false;
     if(!q) return true;
@@ -7336,7 +7356,7 @@ function fundacionesFiltradas(){
 function opcionesLugar(){
   var sel = document.getElementById("fxLugar"); if(!sel) return;
   var lugares = [];
-  DB.fundaciones.forEach(function(f){ if(f.lugar && lugares.indexOf(f.lugar) < 0) lugares.push(f.lugar); });
+  fundacionesDonacion.forEach(function(f){ if(f.lugar && lugares.indexOf(f.lugar) < 0) lugares.push(f.lugar); });
   lugares.sort();
   sel.innerHTML = '<option value="">Ubicación</option>'+
     lugares.map(function(l){ return '<option value="'+esc(l)+'">'+esc(l)+'</option>'; }).join("");
@@ -7379,12 +7399,16 @@ function tarjetaFundacion(f){
       '<h3 class="fx-card__n">'+esc(f.nombre)+'</h3>'+
       '<p class="fx-card__l">'+esc(f.lema||"")+'</p>'+
       (f.aQuien && f.aQuien.length > 26 ? '<p class="fx-card__q">'+esc(f.aQuien)+'</p>' : '')+
-      '<p class="fx-card__d">'+
-        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" '+
-        'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+
-        '<path d="M12 21s6.4-5.6 6.4-10.2A6.4 6.4 0 0 0 5.6 10.8C5.6 15.4 12 21 12 21z"/>'+
-        '<circle cx="12" cy="10.6" r="2.4"/></svg>'+
-        esc(f.lugar||"")+(f.desde ? '<i>|</i>Desde '+f.desde : '')+'</p>'+
+      // Sin ubicación ni año no se dibuja la línea: el ícono de mapa solo,
+      // sin ningún texto al lado, parecía un error de carga.
+      (f.lugar || f.desde
+        ? '<p class="fx-card__d">'+
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" '+
+          'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+
+          '<path d="M12 21s6.4-5.6 6.4-10.2A6.4 6.4 0 0 0 5.6 10.8C5.6 15.4 12 21 12 21z"/>'+
+          '<circle cx="12" cy="10.6" r="2.4"/></svg>'+
+          esc(f.lugar||"")+(f.desde ? (f.lugar ? '<i>|</i>' : '')+'Desde '+f.desde : '')+'</p>'
+        : '')+
       (texto ? '<p class="fx-card__t">'+esc(texto)+'</p>' : '')+
       '<div class="fx-card__pie">'+
         '<button class="fx-b" data-fundacion="'+f.id+'">Ver perfil</button>'+
