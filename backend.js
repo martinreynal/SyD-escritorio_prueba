@@ -149,8 +149,10 @@
     listarPendientes: function () {
       return get("/suenos/admin/pendientes");
     },
-    aprobar: function (id) {
-      return post("/suenos/admin/" + id + "/aprobar");
+    // Al aprobar se define la subasta del sueño: fecha de inicio, fecha de
+    // caducidad y precio base. Sin eso el backend rechaza la aprobación.
+    aprobar: function (id, datos) {
+      return post("/suenos/admin/" + id + "/aprobar", datos);
     },
     rechazar: function (id, motivo) {
       return post("/suenos/admin/" + id + "/rechazar", { motivo: motivo });

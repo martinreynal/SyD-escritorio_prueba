@@ -13327,7 +13327,7 @@ document.addEventListener("keydown", function(e){
 
 
 
-var adminSeccion = "tablero";
+var adminSeccion = "suenos";
 
 // Toda acción administrativa deja rastro: quién, qué y cuándo.
 DB.auditoria = DB.auditoria || [];
@@ -13364,48 +13364,6 @@ function salirDeAdmin(){
 }
 
 // ---- los números de toda la plataforma, en un solo lugar ----
-function cifrasPlataforma(){
-  var sol = DB.solicitudes || [];
-  var don = DB.donaciones || [];
-  var susc = DB.suscripciones || [];
-  var lotes = DB.aportes || [];
-
-  var porDonaciones = don.reduce(function(n,d){ return n + (d.monto||0); }, 0);
-  var porMes = susc.reduce(function(n,x){ return n + (x.monto||0); }, 0);
-  var enSubasta = sol.filter(function(x){ return x.estado === "en subasta"; });
-  var adjudicado = sol.filter(function(x){ return x.estado === "cumplido"; })
-    .reduce(function(n,x){ var m = mejorOferta(x); return n + (m ? m.monto : 0); }, 0);
-
-  return {
-    sol:sol,
-    pendientes: sol.filter(function(x){ return x.estado === "pendiente"; }),
-    porSubastar: sol.filter(function(x){ return x.estado === "por subastar"; }),
-    enSubasta: enSubasta,
-    cumplidos: sol.filter(function(x){ return x.estado === "cumplido"; }),
-    rechazados: sol.filter(function(x){ return x.estado === "rechazado"; }),
-    fundaciones: DB.fundaciones || [],
-    donaciones: don,
-    suscripciones: susc,
-    lotes: lotes,
-    campanas: (DB.fundaciones||[]).reduce(function(n,f){ return n + (f.causas||[]).length; }, 0),
-    eventos: (DB.fundaciones||[]).reduce(function(n,f){ return n + (f.eventos||[]).length; }, 0),
-    recaudado: porDonaciones + adjudicado,
-    aFundaciones: porDonaciones + adjudicado,
-    porMes: porMes,
-    enJuego: enSubasta.reduce(function(n,x){
-      var m = mejorOferta(x); return n + (m ? m.monto : 0); }, 0),
-    personas: (function(){
-      var set = {};
-      don.forEach(function(d){ if(!d.anonimo && d.quien) set[d.quien] = 1; });
-      susc.forEach(function(x){ if(x.quien) set[x.quien] = 1; });
-      sol.forEach(function(x){
-        if(x.quien) set[x.quien] = 1;
-        (x.ofertas||[]).forEach(function(o){ if(!o.anonimo && o.quien) set[o.quien] = 1; });
-      });
-      return Object.keys(set);
-    })()
-  };
-}
 
 // ── Fundaciones (real, contra el backend) ───────────────────────────────
 // Trae TODAS las fundaciones (activas y suspendidas) y las pinta en la
@@ -13596,15 +13554,16 @@ function modalFundacionAdmin(f){
 function pintarAdmin(){
   var caja = $("#adminCuerpo"), tabs = $("#adminTabs");
   if(!caja || !tabs) return;
-  var d = cifrasPlataforma();
 
+  // Solo lo que el cliente pidió. El Tablero y Finanzas de la maqueta se
+  // sacaron: mostraban cifras inventadas (recaudación, plata "pendiente de
+  // giro") que además contradicen el pedido de que la plataforma nunca
+  // intermedie dinero.
   var secciones = [
-    ["tablero", "Tablero", 0],
-    ["suenos", "Sueños", d.pendientes.length],
+    ["suenos", "Sueños", suenosPendientesCount],
     ["solicitudes", "Solicitudes", solicitudesFundacionPendientesCount],
     ["usuarios", "Usuarios", 0],
     ["fundaciones", "Fundaciones", 0],
-    ["finanzas", "Finanzas", 0],
     ["auditoria", "Auditoría", 0]
   ];
   tabs.innerHTML = secciones.map(function(sx){
@@ -13612,126 +13571,9 @@ function pintarAdmin(){
       sx[1]+(sx[2] ? ' <i>'+sx[2]+'</i>' : '')+'</button>';
   }).join("");
 
-  function tarjeta(rot, val, pie, alerta){
-    return '<div class="adm-cifra'+(alerta?' es-alerta':'')+'">'+
-      '<span class="adm-cifra__r">'+rot+'</span>'+
-      '<b class="adm-cifra__v">'+val+'</b>'+
-      (pie ? '<span class="adm-cifra__p">'+pie+'</span>' : '')+'</div>';
-  }
-
-  if(adminSeccion === "tablero"){
-    // Ranking de fundaciones por lo recibido: sirve para ver quién necesita ayuda.
-    var ranking = d.fundaciones.map(function(f){
-      var total = d.donaciones.filter(function(x){ return x.fid === f.id; })
-        .reduce(function(n,x){ return n + (x.monto||0); }, 0);
-      return {f:f, total:total};
-    }).sort(function(a,b){ return b.total - a.total; });
-
-    caja.innerHTML =
-      (d.pendientes.length
-        ? '<button class="adm-aviso" data-adm="suenos">'+
-            '<b>'+d.pendientes.length+(d.pendientes.length===1
-              ? ' sueño espera tu aprobación'
-              : ' sueños esperan tu aprobación')+'</b>'+
-            '<span>Ninguno sale a subasta hasta que lo revises</span></button>'
-        : '')+
-
-      '<p class="frotulo">Dinero</p>'+
-      '<div class="adm-grilla">'+
-        tarjeta("Recaudación total", pesos(d.recaudado), "histórico de la plataforma")+
-        tarjeta("A fundaciones", pesos(d.aFundaciones), "el 100% de lo recaudado")+
-        tarjeta("Apoyos mensuales", pesos(d.porMes), d.suscripciones.length+" activos")+
-        tarjeta("En juego ahora", pesos(d.enJuego), d.enSubasta.length+" subastas abiertas")+
-      '</div>'+
-
-      '<p class="frotulo">Sueños</p>'+
-      '<div class="adm-grilla">'+
-        tarjeta("Publicados", String(d.sol.length), "desde el inicio")+
-        tarjeta("Esperando", String(d.pendientes.length), "sin revisar", d.pendientes.length > 0)+
-        tarjeta("Por subastar", String(d.porSubastar.length), "aprobados, sin abrir")+
-        tarjeta("Cumplidos", String(d.cumplidos.length), d.rechazados.length+" rechazados")+
-      '</div>'+
-
-      '<p class="frotulo">Plataforma</p>'+
-      '<div class="adm-grilla">'+
-        tarjeta("Personas", String(d.personas.length), "con actividad")+
-        tarjeta("Fundaciones", String(d.fundaciones.length), "activas")+
-        tarjeta("Campañas", String(d.campanas), "abiertas")+
-        tarjeta("Actividades", String(d.eventos), "publicadas")+
-      '</div>'+
-
-      '<p class="frotulo">Fundaciones por recaudación</p>'+
-      '<div class="adm-rank">'+
-        ranking.slice(0, 8).map(function(r, i){
-          var max = ranking[0].total || 1;
-          return '<div class="adm-rank__f">'+
-            '<span class="adm-rank__n">'+(i+1)+'</span>'+
-            '<span class="adm-rank__t">'+esc(r.f.nombre)+
-              '<i style="width:'+Math.round(r.total/max*100)+'%"></i></span>'+
-            '<b>'+pesos(r.total)+'</b></div>';
-        }).join("")+
-      '</div>';
-    return;
-  }
-
   if(adminSeccion === "suenos"){
-    function ficha(x, acciones){
-      var m = mejorOferta(x);
-      var fu = fundacionPorId(x.fid);
-      return '<div class="adm-sueno">'+
-        '<div class="adm-sueno__t"><b>'+esc(x.titulo)+'</b>'+
-          '<span class="adm-estado es-'+(x.estado||"").replace(/\s+/g,"-")+'">'+
-          esc(x.estado||"")+'</span></div>'+
-        '<p class="adm-sueno__q">Lo pidió '+esc(x.quien)+
-          (fu ? ' · a beneficio de '+esc(fu.nombre) : '')+'</p>'+
-        (x.aCambio ? '<p class="adm-sueno__d">'+esc(x.aCambio)+'</p>' : '')+
-        '<p class="adm-sueno__m">'+pesos(x.valor||0)+' de base'+
-          (m ? ' · '+pesos(m.monto)+' ofertado' : '')+
-          (x.desdeISO ? ' · sale el '+fechaCorta(x.desdeISO) : '')+
-          (x.cierreISO && !x.desdeISO ? ' · cierra '+fechaCorta(x.cierreISO) : '')+'</p>'+
-        (acciones ? '<div class="adm-sueno__acc">'+acciones+'</div>' : '')+
-      '</div>';
-    }
-
-    caja.innerHTML =
-      '<p class="rec-nota">Ningún sueño sale a subasta solo. Primero se aprueba, '+
-        'después se decide cuándo abre y por cuántos días.</p>'+
-
-      '<p class="frotulo">Esperando aprobación ('+d.pendientes.length+')</p>'+
-      (d.pendientes.length
-        ? d.pendientes.map(function(x){
-            return ficha(x,
-              '<button class="btn btn--primary btn--sm" data-aprobar="'+x.id+'">Aprobar</button>'+
-              '<button class="btn btn--ghost btn--sm" data-rechazar="'+x.id+'">Rechazar</button>');
-          }).join("")
-        : '<div class="empty">No hay sueños esperando.</div>')+
-
-      '<p class="frotulo">Aprobados, sin subasta ('+d.porSubastar.length+')</p>'+
-      (d.porSubastar.length
-        ? d.porSubastar.map(function(x){
-            return ficha(x, x.desdeISO
-              ? '<button class="btn btn--primary btn--sm" data-abrir-subasta="'+x.id+'">'+
-                'Cambiar fecha</button>'+
-                '<button class="btn btn--ghost btn--sm" data-lanzar-ya="'+x.id+'">'+
-                'Lanzar ahora</button>'
-              : '<button class="btn btn--primary btn--sm" data-abrir-subasta="'+x.id+'">'+
-                'Programar subasta</button>');
-          }).join("")
-        : '<div class="empty">Ninguno esperando salir.</div>')+
-
-      '<p class="frotulo">En subasta ('+d.enSubasta.length+')</p>'+
-      (d.enSubasta.length
-        ? d.enSubasta.map(function(x){
-            return ficha(x,
-              '<button class="btn btn--ghost btn--sm" data-pausar="'+x.id+'">'+
-              'Pausar subasta</button>');
-          }).join("")
-        : '<div class="empty">No hay subastas abiertas.</div>')+
-
-      (d.rechazados.length
-        ? '<p class="frotulo">Rechazados ('+d.rechazados.length+')</p>'+
-          d.rechazados.map(function(x){ return ficha(x, ''); }).join("")
-        : '');
+    caja.innerHTML = '<p class="rec-nota">Cargando sueños…</p>';
+    cargarSuenosAdmin(caja);
     return;
   }
 
@@ -13751,52 +13593,6 @@ function pintarAdmin(){
   if(adminSeccion === "fundaciones"){
     caja.innerHTML = '<p class="rec-nota">Cargando fundaciones…</p>';
     cargarFundacionesAdmin(caja);
-    return;
-  }
-
-  if(adminSeccion === "finanzas"){
-    var movs = [];
-    d.donaciones.forEach(function(x){
-      var fu = fundacionPorId(x.fid);
-      movs.push({t:fechaDon(x) || Date.now(), c:"Donación directa",
-                 q:fu ? fu.nombre : "", m:x.monto||0,
-                 e:x.transferido === false ? "pendiente" : "transferido"});
-    });
-    d.suscripciones.forEach(function(x){
-      var fu = fundacionPorId(x.fid);
-      movs.push({t:x.desde || Date.now(), c:"Apoyo mensual",
-                 q:fu ? fu.nombre : "", m:x.monto||0, e:"transferido"});
-    });
-    d.cumplidos.forEach(function(x){
-      var m = mejorOferta(x), fu = fundacionPorId(x.fid);
-      movs.push({t:Date.now(), c:"Subasta adjudicada",
-                 q:fu ? fu.nombre : "", m:m ? m.monto : 0, e:"pendiente"});
-    });
-    movs.sort(function(a,b){ return b.t - a.t; });
-
-    var pendiente = movs.filter(function(m){ return m.e === "pendiente"; })
-      .reduce(function(n,m){ return n + m.m; }, 0);
-
-    caja.innerHTML =
-      '<div class="adm-grilla">'+
-        tarjeta("Movido en total", pesos(d.recaudado), movs.length+" operaciones")+
-        tarjeta("Pendiente de giro", pesos(pendiente), "a fundaciones", pendiente > 0)+
-      '</div>'+
-      '<p class="frotulo">Todas las operaciones</p>'+
-      '<div class="mov">'+
-        '<div class="mov__cab"><span>Fecha</span><span>Concepto</span>'+
-          '<span>Monto</span><span>Estado</span></div>'+
-        movs.slice(0, 40).map(function(m){
-          var f = new Date(m.t);
-          return '<div class="mov__f">'+
-            '<span class="mov__d">'+("0"+f.getDate()).slice(-2)+"/"+
-              ("0"+(f.getMonth()+1)).slice(-2)+'</span>'+
-            '<span class="mov__c"><b>'+m.c+'</b><i>'+esc(m.q)+'</i></span>'+
-            '<span class="mov__m">'+pesos(m.m)+'</span>'+
-            '<span class="mov__e es-'+m.e+'">'+
-              (m.e === "transferido" ? "Transferido" : "Pendiente")+'</span></div>';
-        }).join("")+
-      '</div>';
     return;
   }
 
@@ -13836,41 +13632,141 @@ async function cargarAuditoriaAdmin(caja){
 }
 
 // ---- decisiones sobre un sueño ----
-function aprobarSueno(id){
-  var x = DB.solicitudes.filter(function(s){ return s.id === id; })[0];
-  if(!x) return;
-  x.estado = "por subastar";
-  x.cierreISO = null;
-  anotarAuditoria("Aprobó un sueño", x.titulo, "Pasa a la espera de subasta");
-  DB.avisos.push({id:nid("av"), titulo:"Tu sueño fue aprobado",
-    texto:x.titulo+" ya puede salir a subasta.", hora:"ahora",
-    cuando:new Date().toISOString(), destino:"subastas", clase:"actividad", leido:false});
-  pintarAdmin();
-  toast("Aprobado. Queda esperando a que abras la subasta.");
+// ── Panel de administración: sueños contra la API real ──────────────────
+// Dos listas: los que esperan que el admin los acepte o cancele, y los que
+// ya salieron a subasta. Los rechazados no se listan: el pedido del cliente
+// es "acepto o cancelo", no llevar un archivo de rechazos.
+var suenosPendientesCount = 0;
+async function cargarSuenosAdmin(caja){
+  var pendientes, publicados;
+  try {
+    pendientes = await SyD.suenos.listarPendientes();
+    publicados = await SyD.suenos.listarPublicos();
+  } catch(err) {
+    caja.innerHTML = '<p class="rec-nota">No pudimos cargar los sueños: '+esc(err.message)+'</p>';
+    return;
+  }
+  if(adminSeccion !== "suenos") return; // se cambió de pestaña mientras cargaba
+  suenosPendientesCount = pendientes.length;
+
+  // El PDF pide que desde el panel se vea quién es el soñador y sus datos
+  // para poder contactarlo: por eso acá van mail y teléfono, que no salen
+  // en ninguna pantalla pública.
+  function fichaPendiente(x){
+    var s = x.sonador || {};
+    var contacto = [s.email, s.telefono].filter(Boolean).join(" · ");
+    return '<div class="adm-sueno">'+
+      '<div class="adm-sueno__t"><b>'+esc(x.titulo)+'</b>'+
+        '<span class="adm-estado es-pendiente">Esperando</span></div>'+
+      '<p class="adm-sueno__q">Lo pidió '+esc(((s.nombre||"")+" "+(s.apellido||"")).trim() || "—")+
+        (x.fundacion ? ' · a beneficio de '+esc(x.fundacion.nombre) : '')+'</p>'+
+      (contacto ? '<p class="adm-sueno__q">'+esc(contacto)+'</p>' : '')+
+      '<p class="adm-sueno__d">'+esc(x.descripcion)+'</p>'+
+      '<div class="adm-sueno__acc">'+
+        '<button class="btn btn--primary btn--sm" data-aprobar="'+x.id+'">Aceptar y programar</button>'+
+        '<button class="btn btn--ghost btn--sm" data-rechazar="'+x.id+'">Cancelar</button>'+
+      '</div>'+
+    '</div>';
+  }
+
+  function fichaPublicado(x){
+    var sub = (x.subastas || [])[0];
+    var mejor = sub && (sub.ofertas || [])[0];
+    return '<div class="adm-sueno">'+
+      '<div class="adm-sueno__t"><b>'+esc(x.titulo)+'</b>'+
+        '<span class="adm-estado es-en-subasta">En subasta</span></div>'+
+      '<p class="adm-sueno__q">Lo pidió '+
+        esc(((x.sonador&&x.sonador.nombre||"")+" "+(x.sonador&&x.sonador.apellido||"")).trim() || "—")+
+        (x.fundacion ? ' · a beneficio de '+esc(x.fundacion.nombre) : '')+'</p>'+
+      (sub
+        ? '<p class="adm-sueno__m">'+pesos(Number(sub.precioInicial))+' de base'+
+          (mejor ? ' · '+pesos(Number(mejor.monto))+' ofertado' : ' · sin ofertas todavía')+
+          ' · del '+fechaCorta(sub.fechaInicio)+' al '+fechaCorta(sub.fechaFin)+'</p>'
+        : '')+
+    '</div>';
+  }
+
+  caja.innerHTML =
+    '<p class="rec-nota">Ningún sueño sale a subasta solo: primero lo aceptás acá, '+
+      'y al aceptarlo definís cuándo abre y cuándo cierra.</p>'+
+
+    '<p class="frotulo">Esperando que decidas ('+pendientes.length+')</p>'+
+    (pendientes.length
+      ? pendientes.map(fichaPendiente).join("")
+      : '<div class="empty">No hay sueños esperando.</div>')+
+
+    '<p class="frotulo">En subasta ('+publicados.length+')</p>'+
+    (publicados.length
+      ? publicados.map(fichaPublicado).join("")
+      : '<div class="empty">No hay subastas abiertas.</div>');
 }
 
-function rechazarSueno(id){
-  var x = DB.solicitudes.filter(function(s){ return s.id === id; })[0];
-  if(!x) return;
-  abrirModal({eyebrow:"Moderación", titulo:"Rechazar el sueño",
-    sub:"Contale a la persona por qué. El motivo le llega como aviso.",
-    body:'<div class="field"><label for="admMotivo">Motivo</label>'+
-         '<textarea id="admMotivo" class="caja-grande"></textarea></div>',
-    ok:"Rechazar",
-    onOk:function(){
-      var motivo = val("admMotivo") || "No cumple con las condiciones de la plataforma.";
-      x.estado = "rechazado";
-      x.motivoRechazo = motivo;
-      anotarAuditoria("Rechazó un sueño", x.titulo, motivo);
-      DB.avisos.push({id:nid("av"), titulo:"Tu sueño no fue aprobado",
-        texto:motivo, hora:"ahora", cuando:new Date().toISOString(),
-        destino:"subastas", clase:"actividad", leido:false});
-      cerrarModal(); pintarAdmin();
-      toast("Rechazado.");
+// Aceptar el sueño y, en el mismo paso, programar su subasta. Es el
+// circuito que pidió el cliente: acepto y quedan puestas las dos fechas.
+function aprobarSueno(id){
+  var hoy = new Date();
+  var enUnMes = new Date(hoy.getTime() + 30*24*60*60*1000);
+  function comoFecha(d){ return d.toISOString().slice(0,10); }
+
+  abrirModal({
+    eyebrow:"Sueños", titulo:"Aceptar y programar la subasta",
+    sub:"Al aceptarlo, el sueño sale público y su subasta queda abierta entre estas dos fechas.",
+    body:
+      campo("apDesde","Fecha de inicio","date","")+
+      campo("apHasta","Fecha de caducidad","date","")+
+      campoPesos("apBase","Precio base de la subasta","")+
+      campoPesos("apInc","Incremento mínimo entre ofertas (opcional)","")+
+      '<p class="field__hint">El precio base es desde cuánto arrancan las ofertas.</p>',
+    ok:"Aceptar el sueño",
+    after:function(){
+      $("#apDesde").value = comoFecha(hoy);
+      $("#apHasta").value = comoFecha(enUnMes);
+    },
+    onOk:async function(){
+      var desde = $("#apDesde").value, hasta = $("#apHasta").value;
+      var base = valPesos("apBase"), inc = valPesos("apInc");
+      if(!desde || !hasta){ toast("Poné las dos fechas."); return; }
+      if(!(base > 0)){ toast("Poné el precio base de la subasta."); return; }
+      if(new Date(hasta) <= new Date(desde)){
+        toast("La fecha de caducidad tiene que ser posterior a la de inicio."); return;
+      }
+      try {
+        await SyD.suenos.aprobar(id, {
+          fechaInicio: desde,
+          fechaFin: hasta,
+          precioInicial: base,
+          incrementoMinimo: inc > 0 ? inc : undefined,
+        });
+        cerrarModal();
+        toast("Aceptado. La subasta queda abierta hasta el "+fechaCorta(hasta)+".");
+        pintarAdmin();
+      } catch(err) {
+        toast(err.message);
+      }
     }});
 }
 
-// Acá se decide cuánto dura la subasta: es la parte que antes no existía.
+function rechazarSueno(id){
+  abrirModal({eyebrow:"Sueños", titulo:"Cancelar el sueño",
+    sub:"Contale a la persona por qué. El motivo le llega por mail.",
+    body:'<div class="field"><label for="admMotivo">Motivo</label>'+
+         '<textarea id="admMotivo" class="caja-grande"></textarea></div>',
+    ok:"Cancelar el sueño",
+    onOk:async function(){
+      var motivo = val("admMotivo");
+      if(!motivo){ toast("Escribí el motivo — es lo que va a leer la persona."); return; }
+      try {
+        await SyD.suenos.rechazar(id, motivo);
+        cerrarModal();
+        toast("Cancelado. Le avisamos por mail.");
+        pintarAdmin();
+      } catch(err) {
+        toast(err.message);
+      }
+    }});
+}
+
+
 function abrirSubastaDeSueno(id){
   var x = DB.solicitudes.filter(function(s){ return s.id === id; })[0];
   if(!x) return;
