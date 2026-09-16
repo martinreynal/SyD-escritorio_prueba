@@ -8947,115 +8947,47 @@ function modalContactoFundacion(){
   });
 }
 
+// Donar es un solo paso: se confirma a dónde va la plata y se abre la forma
+// de cobro de la fundación.
+//
+// A propósito NO se pregunta el monto acá. Ese dato no puede viajar hasta la
+// página de la fundación: un link de pago de Mercado Pago tiene el monto fijo
+// desde que se crea, y un alias o un CBU no pueden llevarlo. Preguntarlo
+// obligaba a escribirlo dos veces y dejaba anotado un número que no tenía por
+// qué coincidir con lo que la persona terminaba donando de verdad. El monto se
+// elige en la página de la fundación, que es donde se cobra.
 function modalDonarDirecto(fid, campanaId){
   if(!puedeAportar()){ toast("Las fundaciones reciben donaciones, no las hacen."); return; }
   var f = fundacionPorId(fid); if(!f) return;
-  var campana = campanaId ? f.causas.filter(function(c){ return c.id===campanaId; })[0] : null;
+  var campana = campanaId && f.causas
+    ? f.causas.filter(function(c){ return c.id===campanaId; })[0]
+    : null;
   var destinoTxt = campana ? campana.t : "Aporte general";
-  var falta = campana ? Math.max(0, campana.meta - campana.r) : 0;
+  var cobro = f.linkPago || f.web;
 
-  abrirModal({eyebrow: campana ? "Donar a una campaña" : "Donar a la fundación",
+  abrirModal({
+    eyebrow: campana ? "Donar a una campaña" : "Donar a la fundación",
     titulo: campana ? campana.t : f.nombre,
-    sub: campana ? f.nombre+" · faltan "+pesos(falta)+" para la meta" : f.lugar,
-    ancho:"grande",
+    sub: campana ? f.nombre : (f.lugar || ""),
     body:
       '<div class="destino-fijo">'+
         '<span class="avatar" style="'+avatarCSS(f)+'">'+(f.foto?"":esc(iniciales(f.nombre)))+'</span>'+
         '<div><b>'+esc(destinoTxt)+'</b><span>'+esc(f.nombre)+'</span></div>'+
       '</div>'+
-      (campana
-        ? '<div class="avance" id="ddAvance">'+
-            '<div class="avance__meter">'+
-              '<span class="avance__actual" style="width:0%"></span>'+
-              '<span class="avance__suma" style="width:0%"></span>'+
-            '</div>'+
-            '<div class="avance__pie"><span id="ddAvanceHoy"></span><span id="ddAvanceVos"></span></div>'+
-          '</div>'
-        : '')+
-      campoPesos("ddMonto","¿Cuánto querés donar?","")+
-      '<label class="check"><input type="checkbox" id="ddAnon"> Donar de forma anónima</label>'+
-
-      '<div class="pago-oculto" id="ddPago">'+
-        '<div class="pago-total"><span>Total</span><b id="ddTotal">$0</b></div>'+
-        '<p class="field__hint" style="margin-top:10px">'+
-          (f.linkPago || f.web
-            ? "Te llevamos al link de pago de "+esc(f.nombre)+" para completarla. Soñá y Doná nunca recibe ni retiene ese dinero."
-            : "Esta fundación todavía no cargó su link de pago — avisale al equipo de Soñá y Doná.")+
-        '</p>'+
-      '</div>',
-    ok:"Continuar",
-    after:function(){
-      var abierto = false;
-
-      // Muestra cuánto de la meta cubre lo que estás escribiendo.
-      function pintarAvance(m){
-        if(!campana) return;
-        var pctActual = Math.min(100, campana.r / campana.meta * 100);
-        var pctVos = Math.min(100 - pctActual, m / campana.meta * 100);
-        $("#ddAvance").querySelector(".avance__actual").style.width = pctActual+"%";
-        $("#ddAvance").querySelector(".avance__suma").style.width = pctVos+"%";
-        $("#ddAvanceHoy").textContent = "Hoy va "+Math.round(pctActual)+"% · "+pesos(campana.r)+" de "+pesos(campana.meta);
-        $("#ddAvanceVos").innerHTML = m > 0
-          ? 'Tu aporte suma <b>'+(pctVos < 1 ? (Math.round(pctVos*10)/10) : Math.round(pctVos))+'%</b>'+
-            (campana.r + m >= campana.meta ? ' · llega a la meta' : '')
-          : '';
-      }
-
-      function revisarMonto(){
-        var m = valPesos("ddMonto");
-        pintarAvance(m);
-        var caja = $("#ddPago");
-        if(m > 0 && !abierto){
-          abierto = true;
-          caja.classList.add("is-on");
-          $("#modalOk").textContent = "Donar "+pesos(m);
-          // En vez de estirar la ventana hacia arriba, la acercamos a los medios de pago.
-          setTimeout(function(){
-            if(caja.scrollIntoView) caja.scrollIntoView({behavior:"smooth", block:"nearest"});
-          }, 260);
-        } else if(m > 0){
-          $("#modalOk").textContent = "Donar "+pesos(m);
-        } else {
-          abierto = false;
-          caja.classList.remove("is-on");
-          $("#modalOk").textContent = "Continuar";
-        }
-        $("#ddTotal").textContent = pesos(m);
-      }
-
-      pintarAvance(0);
-      $("#ddMonto").addEventListener("input", revisarMonto);
-
-      // Acá NO se cobra nada: se registra la intención (para poder mostrar
-      // montos recaudados) y se abre el link de pago real de la fundación
-      // en otra pestaña. La plata nunca pasa por nuestro sistema.
-      onOk = function(){
-        if(!exigirSesion("donar")) return;
-        var monto = valPesos("ddMonto");
-        if(!(monto > 0)){
-          if(!DEMO){ toast("Escribí el monto que querés donar."); $("#ddMonto").focus(); return; }
-          monto = 25000;   // beta: si no cargaste nada, ponemos un monto de ejemplo
-        }
-        var anon = $("#ddAnon").checked;
-        var linkFundacion = f.linkPago || f.web;
-        if(campana) campana.r += monto;
-        else f.aporteGeneral = (f.aporteGeneral||0) + monto;
-        DB.donaciones.push({id:nid("d"), quien:sesion.nombre,
-          quienPublico:anon ? "Donante anónimo" : sesion.nombre, anonimo:anon,
-          mail:sesion.mail, fid:f.id, causa:destinoTxt, monto:monto,
-          tipo:"directa", metodo:"Link de la fundación", fecha:"hoy", fechaISO:hoyISO()});
-        avisarFundacion(f.id, "Recibiste una donación",
-          pesos(monto)+" para "+destinoTxt+".", "recaudacion", "donacion");
-
-        cerrarModal(); pintarTodo();
-        if(linkFundacion){
-          window.open(linkFundacion, "_blank", "noopener");
-          toast("¡Gracias! Completá tu donación de "+pesos(monto)+" en la pestaña que se abrió.");
-        } else {
-          toast("Esta fundación todavía no cargó su link de pago — avisale al equipo de Soñá y Doná.");
-        }
-      };
-    }});
+      (cobro
+        ? '<p class="field__hint" style="margin-top:14px">Te llevamos a <b>'+esc(f.nombre)+
+          '</b>, donde elegís el monto y completás la donación. Soñá y Doná nunca recibe ni '+
+          'retiene ese dinero: va directo a la fundación.</p>'
+        : '<p class="field__hint" style="margin-top:14px">Esta fundación todavía no cargó cómo '+
+          'recibir donaciones. Avisale al equipo de Soñá y Doná.</p>'),
+    ok: cobro ? "Ir a donar" : false,
+    onOk:function(){
+      if(!exigirSesion("donar")) return;
+      cerrarModal();
+      abrirFormaDeCobro(cobro, f.nombre);
+      if(esLink(cobro)) toast("Completá tu donación en la pestaña que se abrió.");
+    }
+  });
 }
 
 // Ver la foto del lote en grande.
@@ -12444,7 +12376,7 @@ function pintarAporte(){
 
 // Publicar el sueño contra la API. Va aparte porque avanzarAporte() es
 // sincrónica y esto necesita esperar la respuesta del servidor.
-async function publicarSuenoReal(datos, valor, linkFundacion){
+async function publicarSuenoReal(datos, valor, linkFundacion, nombreFundacion){
   try {
     await SyD.suenos.publicar(datos);
   } catch(err) {
@@ -12452,9 +12384,11 @@ async function publicarSuenoReal(datos, valor, linkFundacion){
     return;
   }
 
-  // Si además eligió donar, la plata va directo a la fundación — nunca
-  // pasa por nuestro sistema. Se abre su link real en otra pestaña.
-  if(valor > 0 && linkFundacion) window.open(linkFundacion, "_blank", "noopener");
+  // Si además eligió donar, la plata va directo a la fundación — nunca pasa
+  // por nuestro sistema. Se usa el mismo camino que el resto de las
+  // donaciones, que contempla que la forma de cobro pueda ser un alias o un
+  // CBU y no solo un link.
+  if(valor > 0 && linkFundacion) abrirFormaDeCobro(linkFundacion, nombreFundacion);
 
   cerrarAporte(); pintarTodo();
   toast(valor > 0
@@ -12506,12 +12440,14 @@ function avanzarAporte(){
     // El sueño se publica contra la API real y nace PENDIENTE: no sale a
     // la web hasta que el admin lo acepta. Ese es el filtro de aprobación
     // que pide el pedido del cliente.
+    // Ojo: lo que la persona pone acá es una donación opcional suya, NO la
+    // meta del sueño. Se mandaba como montoObjetivo, que es otra cosa — el
+    // sueño quedaba con una meta que nadie fijó.
     publicarSuenoReal({
       titulo: titulo,
       descripcion: texto,
-      montoObjetivo: valor > 0 ? valor : undefined,
       fundacionId: fid
-    }, valor, linkFundacion);
+    }, valor, linkFundacion, f && f.nombre);
     return;
   }
 
