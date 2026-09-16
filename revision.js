@@ -30,25 +30,25 @@
       sel: "#screen-admin",
       estado: "real",
       titulo: "Panel de administración",
-      nota: "Sus seis secciones trabajan contra la base de datos: Sueños, Solicitudes, Usuarios, Fundaciones, Eventos y Auditoría.",
+      nota: "Sus seis secciones trabajan contra la base de datos: Sueños, Solicitudes, Usuarios, Fundaciones, Eventos y Auditoría. Las pestañas Tablero y Finanzas de la maqueta se sacaron: mostraban cifras inventadas.",
     },
     {
       sel: "#screen-fundaciones",
       estado: "real",
       titulo: "Conocé las fundaciones",
-      nota: "Muestra las fundaciones que se cargan en el panel, rama Donaciones. Donar abre la forma de cobro real de cada una.",
+      nota: "Muestra las fundaciones que se cargan en el panel, rama Donaciones. El buscador también busca entre ellas. Donar no pregunta el monto: lleva directo a la forma de cobro de la fundación (su página si es un link, o los datos para transferir si es un alias o un CBU).",
     },
     {
       sel: "#screen-eventos",
       estado: "real",
       titulo: "Actividades y eventos",
-      nota: "Los eventos se cargan desde el panel. La doble confirmación de asistencia queda registrada en la base.",
+      nota: "Los eventos se cargan desde el panel. Anotarse pide confirmar dos veces, como pidió el cliente, y los dos pasos quedan registrados por separado en la base. Si el evento tiene entrada, al confirmar muestra cómo pagarle a la fundación.",
     },
     {
       sel: "#screen-aporte",
       estado: "mixto",
       titulo: "Contar tu sueño",
-      nota: "Publicar un sueño es real: queda esperando la aprobación del administrador. Las otras formas de aportar (voluntariado, materiales, servicios) siguen siendo maqueta y no estaban en el pedido.",
+      nota: "Publicar un sueño es real: queda esperando la aprobación del administrador, y lo que escribís no se pierde si tenés que iniciar sesión para publicarlo. Las otras formas de aportar (voluntariado, materiales, servicios) siguen siendo maqueta y no estaban en el pedido.",
     },
     {
       sel: "#screen-registro",
@@ -60,7 +60,7 @@
       sel: "#screen-deseos",
       estado: "maqueta",
       titulo: "Subastas activas",
-      nota: "Los sueños en subasta y las ofertas son inventados. El motor de subastas está construido y probado del lado del servidor; falta conectar esta pantalla, y antes hay que definir quién paga el cobro de $20.000.",
+      nota: "Los sueños en subasta y las ofertas son inventados. El motor de subastas está construido y probado del lado del servidor, incluido el control de que dos ofertas simultáneas nunca se pisen. Falta conectar esta pantalla, y antes hay que cerrar cómo se cobran los $20.000.",
     },
     {
       sel: "#screen-subastas",

@@ -7456,18 +7456,22 @@ function marcarCoincidencia(texto, q){
   return esc(texto.slice(0,i))+'<span class="sug__match">'+esc(texto.slice(i,i+q.length))+'</span>'+esc(texto.slice(i+q.length));
 }
 
+// Sugerencias del buscador. Busca entre las fundaciones REALES de la rama de
+// donaciones, las mismas que lista la pantalla: antes sugería las de la
+// maqueta, así que la lista de abajo mostraba unas y el desplegable ofrecía
+// otras que no existen.
 function buscarFundaciones(q){
   q = q.trim().toLowerCase();
   if(!q) return [];
-  return DB.fundaciones.map(function(f){
+  return fundacionesDonacion.map(function(f){
     var nombre = f.nombre.toLowerCase();
-    var causa = f.causas.filter(function(c){ return c.t.toLowerCase().indexOf(q) > -1; })[0];
+    var causa = (f.causas||[]).filter(function(c){ return c.t.toLowerCase().indexOf(q) > -1; })[0];
     var puntaje = -1;
     if(nombre.indexOf(q) === 0) puntaje = 0;                     // empieza igual: lo más probable
     else if(nombre.indexOf(q) > 0) puntaje = 1;
-    else if(f.lugar.toLowerCase().indexOf(q) > -1) puntaje = 2;
+    else if((f.lugar||"").toLowerCase().indexOf(q) > -1) puntaje = 2;
     else if(causa) puntaje = 3;
-    else if(f.lema.toLowerCase().indexOf(q) > -1) puntaje = 4;
+    else if((f.lema||"").toLowerCase().indexOf(q) > -1) puntaje = 4;
     return {f:f, puntaje:puntaje, causa:causa};
   }).filter(function(r){ return r.puntaje >= 0; })
     .sort(function(a,b){ return a.puntaje - b.puntaje || a.f.nombre.localeCompare(b.f.nombre); })
@@ -7492,7 +7496,9 @@ function pintarSugerencias(){
   } else {
     caja.innerHTML = res.map(function(r,i){
       var f = r.f;
-      var detalle = r.causa ? "Campaña: "+r.causa.t : f.lugar+" · "+f.lema;
+      var detalle = r.causa
+        ? "Campaña: "+r.causa.t
+        : [f.lugar, f.lema].filter(Boolean).join(" · ");
       return '<button class="sug'+(i===0?" sug--top":"")+'" data-sug="'+f.id+'" role="option">'+
         '<span class="avatar" style="'+avatarCSS(f)+'">'+(f.foto?"":esc(iniciales(f.nombre)))+'</span>'+
         '<span><span class="sug__n">'+marcarCoincidencia(f.nombre, q)+'</span>'+
