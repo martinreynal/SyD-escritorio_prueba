@@ -13503,8 +13503,8 @@ async function cargarFundacionesAdmin(caja){
               '<span>'+esc(f.linkPago || "Sin link de pago cargado")+'</span>'+
               '<span class="adm-estado es-'+(suspendida?"suspendida":"activa")+'">'+
               (suspendida ? "Suspendida" : "Activa")+'</span>'+
-              '<span class="adm-estado '+(f.linkFeeSubasta?'es-activa':'es-suspendida')+'">'+
-              (f.linkFeeSubasta ? "Habilitada para subastar" : "Solo donaciones")+'</span>'+
+              (f.paraDonacion ? '<span class="adm-estado es-activa">Donaciones</span>' : '')+
+              (f.paraSubasta ? '<span class="adm-estado es-activa">Sueños y subastas</span>' : '')+
             '</span>'+
             '<button class="btn btn--ghost btn--sm" data-editar-fundacion="'+f.id+'">Editar</button>'+
             '<button class="btn btn--ghost btn--sm" data-suspender-real="'+f.id+'" data-estado="'+(suspendida?"suspendida":"activa")+'">'+
@@ -13525,13 +13525,26 @@ function modalFundacionAdmin(f){
       campo("mfNombre","Nombre","text","") +
       campo("mfDescripcion","Descripción","textarea","") +
       campo("mfLogo","URL del logo (opcional)","text","https://…") +
-      campo("mfLink","Link de pago para donaciones (obligatorio)","text","https://link.mercadopago.com.ar/…") +
-      campo("mfLinkFee","Link para cobrar el fee de subasta (opcional)","text","https://link.mercadopago.com.ar/…",
-        '<p class="field__hint">Si lo dejás vacío, esta fundación no aparece como opción para subastar todavía.</p>') +
+      // Las dos ramas del alta. No son excluyentes a propósito: una misma
+      // fundación puede recibir donaciones y además estar habilitada para
+      // sueños y subastas.
+      '<div class="field">'+
+        '<label>¿En qué parte de la web se publica?</label>'+
+        '<label class="check"><input type="checkbox" id="mfRamaDonacion"> Donaciones — aparece en la sección de donar</label>'+
+        '<label class="check"><input type="checkbox" id="mfRamaSubasta"> Sueños y subastas — aparece en la sección de sueños</label>'+
+        '<p class="field__hint">Puede estar en las dos a la vez.</p>'+
+      '</div>' +
+      campo("mfLink","Cómo recibe las donaciones (obligatorio)","text","Link de pago, alias o CBU",
+        '<p class="field__hint">Va directo a la fundación: puede ser un link de pago, un alias o un CBU. Soñá y Doná nunca recibe esa plata.</p>') +
+      campo("mfLinkFee","Cómo se le cobra el fee de subasta","text","Link de pago, alias o CBU",
+        '<p class="field__hint">Obligatorio si la publicás en Sueños y subastas.</p>') +
       campo("mfMail","Mail de contacto (opcional)","email","") +
       campo("mfTelefono","Teléfono de contacto (opcional)","text",""),
     ok: esNueva ? "Crear fundación" : "Guardar cambios",
     after:function(){
+      // Una fundación nueva arranca en Donaciones, que es el caso más común.
+      $("#mfRamaDonacion").checked = f ? f.paraDonacion !== false : true;
+      $("#mfRamaSubasta").checked = f ? f.paraSubasta === true : false;
       if(f){
         $("#mfNombre").value = f.nombre || "";
         $("#mfDescripcion").value = f.descripcion || "";
@@ -13544,12 +13557,24 @@ function modalFundacionAdmin(f){
     },
     onOk:async function(){
       var nombre = val("mfNombre"), link = val("mfLink");
+      var paraDonacion = $("#mfRamaDonacion").checked, paraSubasta = $("#mfRamaSubasta").checked;
+      var linkFee = val("mfLinkFee");
       if(!nombre){ toast("Ponele un nombre a la fundación."); return; }
-      if(!link){ toast("El link de pago es obligatorio — es adonde va la plata de las donaciones."); return; }
+      if(!link){ toast("Falta cómo recibe las donaciones — es adonde va la plata."); return; }
+      // Las mismas dos reglas que valida el backend, acá para avisar antes
+      // de mandar el pedido y no después.
+      if(!paraDonacion && !paraSubasta){
+        toast("Elegí al menos una parte de la web donde publicarla."); return;
+      }
+      if(paraSubasta && !linkFee){
+        toast("Para publicarla en Sueños y subastas hace falta cargar cómo se le cobra el fee."); return;
+      }
       var datos = {
         nombre: nombre,
         linkPago: link,
-        linkFeeSubasta: val("mfLinkFee") || undefined,
+        linkFeeSubasta: linkFee || undefined,
+        paraDonacion: paraDonacion,
+        paraSubasta: paraSubasta,
         descripcion: val("mfDescripcion") || undefined,
         logoUrl: val("mfLogo") || undefined,
         contactoEmail: val("mfMail") || undefined,
