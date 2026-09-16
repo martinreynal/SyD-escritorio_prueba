@@ -194,8 +194,11 @@
 
   // ── Fundaciones ──────────────────────────────────────────────────────
   var fundaciones = {
-    listar: function () {
-      return get("/fundaciones");
+    // `rama` es "donacion" o "subasta": el alta de fundaciones está dividida
+    // en dos y cada sección del front pide la suya. Sin rama trae todas las
+    // activas.
+    listar: function (rama) {
+      return get("/fundaciones" + (rama ? "?rama=" + encodeURIComponent(rama) : ""));
     },
     // Admin: incluye también las suspendidas (la de arriba solo trae activas).
     listarTodas: function () {

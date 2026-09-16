@@ -5782,7 +5782,10 @@ var toastT;
 function toast(m){ var el=$("#toast"); el.textContent=m; el.classList.add("is-on");
   clearTimeout(toastT); toastT=setTimeout(function(){ el.classList.remove("is-on"); },3000); }
 function avatarCSS(x){
-  if(x.foto && x.foto.indexOf("data:")===0) return "background-image:url("+x.foto+")";
+  // Las fundaciones de la maqueta traen la foto embebida (data:) y las
+  // reales un logoUrl normal servido por http(s): sirven las dos.
+  if(x.foto && (x.foto.indexOf("data:")===0 || x.foto.indexOf("http")===0))
+    return "background-image:url("+x.foto+")";
   return "background:"+(x.color||"#87CEEB");
 }
 function leerArchivo(input, cb){
@@ -6885,7 +6888,44 @@ function esFundacion(){ return sesion && sesion.tipo === "fundacion"; }
 
 function miFundacion(){ return esFundacion() ? DB.fundaciones.filter(function(f){ return f.id===sesion.fid; })[0] : null; }
 
-function fundacionPorId(id){ return DB.fundaciones.filter(function(f){ return f.id===id; })[0]; }
+// ── Fundaciones reales, separadas por rama ──────────────────────────────
+// El alta de fundaciones está dividida en dos: las que se publican para
+// donar y las que se publican para sueños y subastas. Cada sección del
+// front pide la suya, y estas dos listas son la copia local de esa
+// respuesta. Conviven con DB.fundaciones (las de la maqueta), que todavía
+// alimentan las pantallas que no están en el pedido del cliente.
+var fundacionesDonacion = [], fundacionesSubasta = [];
+
+function normalizarFundacion(f){
+  // El resto del front espera `foto`; la API devuelve `logoUrl`.
+  f.foto = f.logoUrl || "";
+  return f;
+}
+
+async function cargarFundacionesReales(){
+  try {
+    var r = await Promise.all([
+      SyD.fundaciones.listar("donacion"),
+      SyD.fundaciones.listar("subasta")
+    ]);
+    fundacionesDonacion = r[0].map(normalizarFundacion);
+    fundacionesSubasta = r[1].map(normalizarFundacion);
+  } catch(err) {
+    // Si el backend no responde, las pantallas que dependen de esto avisan
+    // por su cuenta. No rompemos el resto de la página por eso.
+    fundacionesDonacion = []; fundacionesSubasta = [];
+  }
+}
+
+function fundacionPorId(id){
+  // Las listas reales se declaran más abajo en el archivo, pero esta
+  // función se usa antes (al armar los datos de la maqueta), así que
+  // pueden estar todavía sin inicializar.
+  var reales = (fundacionesDonacion || []).concat(fundacionesSubasta || []);
+  var real = reales.filter(function(f){ return f.id===id; })[0];
+  if(real) return real;
+  return DB.fundaciones.filter(function(f){ return f.id===id; })[0];
+}
 
 
 /* ---- carrusel reutilizable, infinito y encadenado ----
@@ -11897,26 +11937,30 @@ function prepararPasoSueno(){
     var f = fundacionPorId(oculto.value);
     $("#snFund").innerHTML = f
       ? '<span class="avatar" style="'+avatarCSS(f)+'">'+(f.foto?"":esc(iniciales(f.nombre)))+'</span>'+
-        '<span><b>'+esc(f.nombre)+'</b><span>'+esc(f.aQuien || f.lema || "")+'</span></span>'
+        '<span><b>'+esc(f.nombre)+'</b><span>'+esc(f.descripcion || f.aQuien || f.lema || "")+'</span></span>'
       : '<em>Todavía no elegiste</em>';
     revisarPublicar();
   }
   [tit, txt, val$].forEach(function(e){ if(e) e.addEventListener("input", espejo); });
 
-  // Las cuatro fundaciones se filtran con lo que se escribe en el buscador.
+  // Las fundaciones que se ofrecen acá son las reales que el admin publicó
+  // en la rama de sueños y subastas, no las de la maqueta.
   function pintarFunds(){
     var t = q.value.trim().toLowerCase();
-    var lista = DB.fundaciones.filter(function(f){
-      return !t || (f.nombre+" "+(f.lugar||"")+" "+(f.aQuien||"")).toLowerCase().indexOf(t) > -1;
+    var lista = fundacionesSubasta.filter(function(f){
+      return !t || (f.nombre+" "+(f.descripcion||"")).toLowerCase().indexOf(t) > -1;
     }).slice(0, 4);
     res.innerHTML = lista.length
       ? lista.map(function(f){
           return '<button type="button" class="sn-fund'+(oculto.value===f.id?" is-on":"")+'" data-elige-fund="'+f.id+'">'+
             '<span class="avatar" style="'+avatarCSS(f)+'">'+(f.foto?"":esc(iniciales(f.nombre)))+'</span>'+
-            '<span class="sn-fund__t"><b>'+esc(f.nombre)+'</b><span>'+esc(f.aQuien || f.lema || "")+'</span></span>'+
+            '<span class="sn-fund__t"><b>'+esc(f.nombre)+'</b><span>'+esc(f.descripcion || f.aQuien || f.lema || "")+'</span></span>'+
             '<span class="sn-fund__m" aria-hidden="true"></span></button>';
         }).join("")
-      : '<p class="fund-res__vacio">No encontramos esa fundación.</p>';
+      : '<p class="fund-res__vacio">'+
+        (fundacionesSubasta.length
+          ? "No encontramos esa fundación."
+          : "Todavía no hay fundaciones habilitadas para sueños.")+'</p>';
   }
   q.addEventListener("input", pintarFunds);
   res.addEventListener("click", function(e){
@@ -11956,7 +12000,7 @@ function prepararPasoSueno(){
 // Enciende o apaga Publicar según lo cargado.
 function revisarPublicar(){
   var b = $("#apEnviar"); if(!b) return;
-  var listo = !!(val("ppTitulo") && val("ppCambio") && valPesos("ppValor") > 0 &&
+  var listo = !!(val("ppTitulo") && val("ppCambio") &&
                  $("#ppFundV") && $("#ppFundV").value);
   b.disabled = !listo;
   b.classList.toggle("es-apagado", !listo);
@@ -12227,6 +12271,26 @@ function pintarAporte(){
   });
 }
 
+// Publicar el sueño contra la API. Va aparte porque avanzarAporte() es
+// sincrónica y esto necesita esperar la respuesta del servidor.
+async function publicarSuenoReal(datos, valor, linkFundacion){
+  try {
+    await SyD.suenos.publicar(datos);
+  } catch(err) {
+    toast(err.message);
+    return;
+  }
+
+  // Si además eligió donar, la plata va directo a la fundación — nunca
+  // pasa por nuestro sistema. Se abre su link real en otra pestaña.
+  if(valor > 0 && linkFundacion) window.open(linkFundacion, "_blank", "noopener");
+
+  cerrarAporte(); pintarTodo();
+  toast(valor > 0
+    ? "Tu sueño quedó enviado a revisión. Completá tu donación en la pestaña que se abrió."
+    : "Tu sueño quedó enviado a revisión. Te avisamos por mail cuando lo aprueben.");
+}
+
 function avanzarAporte(){
   if(!aporte) return;
 
@@ -12259,26 +12323,20 @@ function avanzarAporte(){
     }
 
     var valor = aporte.valor || 0;
-    var fid = aporte.fid || DB.fundaciones[0].id;
+    var fid = aporte.fid;
+    if(!fid){ toast("Elegí la fundación que querés apoyar."); return; }
     var f = fundacionPorId(fid);
     var linkFundacion = f && (f.linkPago || f.web);
 
-    // Si eligió donar algo, la plata va directo a la fundación — nunca
-    // pasa por nuestro sistema. Abrimos su link real en otra pestaña y
-    // seguimos con la publicación del sueño en esta.
-    if(valor > 0 && linkFundacion) window.open(linkFundacion, "_blank", "noopener");
-
-    DB.solicitudes.push({id:nid("s"), quien:sesion.nombre, titulo:titulo, aCambio:texto,
-      fid:fid, destino:null, valor:valor, asociado:null, estado:"en subasta", cierreISO:"2026-09-08T21:00", fecha:hoyISO(),
-      mail:sesion.mail, whatsapp:null, ofertas:[]});
-
-    avisarFundacion(fid, "Te dirigieron un sueño",
-      titulo+" salió a subasta a beneficio de tu fundación.", "recaudacion", "superado");
-
-    cerrarAporte(); pintarTodo();
-    toast(valor > 0
-      ? "Tu sueño quedó publicado. Completá tu donación en la pestaña que se abrió."
-      : "Tu sueño quedó publicado a beneficio de "+f.nombre+".");
+    // El sueño se publica contra la API real y nace PENDIENTE: no sale a
+    // la web hasta que el admin lo acepta. Ese es el filtro de aprobación
+    // que pide el pedido del cliente.
+    publicarSuenoReal({
+      titulo: titulo,
+      descripcion: texto,
+      montoObjetivo: valor > 0 ? valor : undefined,
+      fundacionId: fid
+    }, valor, linkFundacion);
     return;
   }
 
@@ -13410,6 +13468,7 @@ async function cargarSolicitudesFundacionAdmin(caja){
     return;
   }
   solicitudesFundacionPendientesCount = solicitudes.filter(function(s){ return !s.atendida; }).length;
+  pintarTabsAdmin();
   if(adminSeccion !== "solicitudes") return;
 
   caja.innerHTML =
@@ -13551,10 +13610,11 @@ function modalFundacionAdmin(f){
   });
 }
 
-function pintarAdmin(){
-  var caja = $("#adminCuerpo"), tabs = $("#adminTabs");
-  if(!caja || !tabs) return;
-
+// Las pestañas se dibujan aparte porque los contadores (sueños esperando,
+// solicitudes sin atender) se saben recién cuando termina de responder el
+// backend, después de que la pantalla ya se pintó una vez.
+function pintarTabsAdmin(){
+  var tabs = $("#adminTabs"); if(!tabs) return;
   // Solo lo que el cliente pidió. El Tablero y Finanzas de la maqueta se
   // sacaron: mostraban cifras inventadas (recaudación, plata "pendiente de
   // giro") que además contradicen el pedido de que la plataforma nunca
@@ -13570,6 +13630,13 @@ function pintarAdmin(){
     return '<button class="adm-tab'+(adminSeccion===sx[0]?' is-on':'')+'" data-adm="'+sx[0]+'">'+
       sx[1]+(sx[2] ? ' <i>'+sx[2]+'</i>' : '')+'</button>';
   }).join("");
+}
+
+function pintarAdmin(){
+  var caja = $("#adminCuerpo"), tabs = $("#adminTabs");
+  if(!caja || !tabs) return;
+
+  pintarTabsAdmin();
 
   if(adminSeccion === "suenos"){
     caja.innerHTML = '<p class="rec-nota">Cargando sueños…</p>';
@@ -13646,8 +13713,9 @@ async function cargarSuenosAdmin(caja){
     caja.innerHTML = '<p class="rec-nota">No pudimos cargar los sueños: '+esc(err.message)+'</p>';
     return;
   }
-  if(adminSeccion !== "suenos") return; // se cambió de pestaña mientras cargaba
   suenosPendientesCount = pendientes.length;
+  pintarTabsAdmin();
+  if(adminSeccion !== "suenos") return; // se cambió de pestaña mientras cargaba
 
   // El PDF pide que desde el panel se vea quién es el soñador y sus datos
   // para poder contactarlo: por eso acá van mail y teléfono, que no salen
@@ -13892,6 +13960,7 @@ SyD.auth.onCambioDeSesion(function(sesionSb){
 // Cierre: se vuelve a fijar la pestaña del menú y se remide, ya con todo
 // dibujado. Sin esto, el primer reparto queda hecho sobre medidas a medio
 // asentar y el menú puede aparecer descolocado.
+cargarFundacionesReales();
 try { irA(1); } catch(err){}
 try { revisarMenuFijo(); } catch(err){}
 document.body.classList.add("app-lista");
