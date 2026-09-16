@@ -6901,6 +6901,10 @@ function miFundacion(){ return esFundacion() ? DB.fundaciones.filter(function(f)
 // respuesta. Conviven con DB.fundaciones (las de la maqueta), que todavía
 // alimentan las pantallas que no están en el pedido del cliente.
 var fundacionesDonacion = [], fundacionesSubasta = [];
+// La promesa de la primera carga: quien necesite las fundaciones ya listas
+// (por ejemplo, retomar un sueño a medio publicar) la espera en vez de
+// encontrarse con las listas todavía vacías.
+var fundacionesListas = null;
 
 // Las fundaciones reales tienen mucho menos datos que las de la maqueta:
 // nombre, descripción, logo y forma de cobro. Esto las lleva a la forma que
@@ -12123,12 +12127,72 @@ function abrirPantallaAporte(modo, fidPre){
   pintarAporte();
   window.scrollTo({top:0});
 }
+// ── Borrador del sueño mientras la persona inicia sesión ────────────────
+// Publicar un sueño pide cuenta recién al confirmar, así que es normal
+// llenar todo el formulario y recién ahí tener que entrar. Sin esto, al
+// volver del login el formulario aparecía vacío y había que escribir todo de
+// nuevo — justo lo contrario de lo que promete el cartel ("entrás y volvés
+// justo donde estabas").
+//
+// Se guarda en el navegador y no en memoria porque el login con Google sale
+// de la página y vuelve: una variable no sobrevive a eso.
+var CLAVE_BORRADOR = "syd_borrador_sueno";
+
+function guardarBorradorSueno(){
+  if(!aporte || aporte.modo !== "propuesta") return;
+  try {
+    localStorage.setItem(CLAVE_BORRADOR, JSON.stringify({
+      titulo: aporte.titulo || "",
+      texto: aporte.texto || "",
+      valor: aporte.valor || 0,
+      fid: aporte.fid || null,
+      cuando: Date.now()
+    }));
+  } catch(err) {}   // ventana privada o sin permisos: se pierde, no se rompe
+}
+
+function olvidarBorradorSueno(){
+  try { localStorage.removeItem(CLAVE_BORRADOR); } catch(err) {}
+}
+
+function leerBorradorSueno(){
+  try {
+    var b = JSON.parse(localStorage.getItem(CLAVE_BORRADOR) || "null");
+    if(!b || !b.titulo) return null;
+    // Un borrador viejo ya no corresponde: se guardó para volver de un login
+    // que pasa en el momento, no para recuperar algo de la semana pasada.
+    if(Date.now() - (b.cuando || 0) > 60*60*1000){ olvidarBorradorSueno(); return null; }
+    return b;
+  } catch(err) { return null; }
+}
+
+// Se llama al entrar con sesión: si había un sueño a medio publicar, se abre
+// de nuevo el formulario con todo cargado, en el paso de confirmar.
+async function retomarBorradorSueno(){
+  var b = leerBorradorSueno();
+  if(!b) return;
+  olvidarBorradorSueno();
+  // La tarjeta de resumen muestra la fundación elegida, así que hay que
+  // esperar a que las fundaciones estén cargadas para no pintarla vacía.
+  try { if(fundacionesListas) await fundacionesListas; } catch(err) {}
+  aporte = {modo:"propuesta", paso:1, tipo:null, titulo:b.titulo, texto:b.texto,
+            valor:b.valor, fid:b.fid};
+  marcarTab("");
+  $$(".screen").forEach(function(sc){ sc.classList.remove("is-active"); });
+  $("#screen-aporte").classList.add("is-active");
+  pintarAporte();
+  try { revisarMenuFijo(); } catch(err){}
+  window.scrollTo({top:0});
+  toast("Seguimos donde estabas: revisá y publicá tu sueño.");
+}
+
 function cerrarAporte(){
   var sc = $("#screen-aporte");
   sc.classList.remove("is-active", "sn-modo", "ap3-modo");
   if(sesion) $("#screen-app").classList.add("is-active");
   else $("#screen-app").classList.add("is-active");
   aporte = null;
+  olvidarBorradorSueno();
   revisarCielo();
 }
 
@@ -12419,7 +12483,11 @@ function avanzarAporte(){
   }
 
   if(aporte.modo === "propuesta"){
+    // Antes de mandar a iniciar sesión se guarda lo escrito, para poder
+    // devolverlo tal cual cuando vuelva.
+    guardarBorradorSueno();
     if(!exigirSesion("publicar tu sueño")) return;
+    olvidarBorradorSueno();   // ya tenía sesión: no hay nada que retomar
     var titulo = aporte.titulo, texto = aporte.texto;
     if(DEMO){
       if(!titulo) titulo = "Mi deseo de prueba";
@@ -12976,6 +13044,21 @@ function entrarComoFundacion(fid){
 
 function mostrarApp(){
   document.body.classList.remove("portada");
+  // Al iniciar sesión esto se llama dos veces (una por el login y otra por el
+  // aviso de cambio de sesión). Si hay un sueño a medio publicar en pantalla,
+  // la segunda no tiene que taparlo con la portada.
+  if(aporte && $("#screen-aporte").classList.contains("is-active")){
+    // Se apagan las demás pantallas igual, o la portada queda encima. Y hay
+    // que revisar el menú fijo: es una clase del body que queda pegada de
+    // cuando sí estaba la portada, y deja el menú de escritorio flotando
+    // sobre el formulario.
+    $$(".screen").forEach(function(sc){
+      if(sc.id !== "screen-aporte") sc.classList.remove("is-active");
+    });
+    pintarTodo();
+    try { revisarMenuFijo(); } catch(err){}
+    return;
+  }
   $$(".screen").forEach(function(sc){ sc.classList.remove("is-active"); });
   $("#screen-app").classList.add("is-active");
   // Se recargan acá y no solo al arrancar porque el listado trae, si hay
@@ -12983,6 +13066,9 @@ function mostrarApp(){
   // entrar o salir de una cuenta ese dato cambia.
   cargarEventosReales();
   pintarTodo(); irA(esFundacion() ? 0 : 1); revisarCielo();
+  // Si venía de llenar un sueño y tuvo que entrar para publicarlo, vuelve a
+  // ese formulario con todo cargado en vez de quedar en la portada.
+  if(sesion) retomarBorradorSueno();
 }
 function abrirLogin(){
   if(!document.body.classList.contains("es-crear")){
@@ -14242,7 +14328,7 @@ SyD.auth.onCambioDeSesion(function(sesionSb){
 // Cierre: se vuelve a fijar la pestaña del menú y se remide, ya con todo
 // dibujado. Sin esto, el primer reparto queda hecho sobre medidas a medio
 // asentar y el menú puede aparecer descolocado.
-cargarFundacionesReales();
+fundacionesListas = cargarFundacionesReales();
 try { irA(1); } catch(err){}
 try { revisarMenuFijo(); } catch(err){}
 document.body.classList.add("app-lista");
