@@ -58,21 +58,21 @@
     },
     {
       sel: "#screen-deseos",
-      estado: "maqueta",
+      estado: "real",
       titulo: "Subastas activas",
-      nota: "Las subastas que se ven acá y sus ofertas son inventadas. El motor está construido y probado del lado del servidor, incluido el control de que dos ofertas simultáneas nunca se pisen, y el cobro del fee ya funciona de punta a punta. Falta conectar esta pantalla y la de ofertar.",
+      nota: "Muestra las subastas que están corriendo, con el precio base real y quién va ganando. Ofertar queda registrado, y si alguien oferta mientras estás mirando la pantalla se actualiza sola. Dos ofertas al mismo tiempo nunca se pisan.",
     },
     {
       sel: "#screen-subastas",
-      estado: "maqueta",
-      titulo: "Otros sueños / próximos",
-      nota: "Datos inventados. Se conecta junto con la pantalla de subastas.",
+      estado: "real",
+      titulo: "Sueños por subastar",
+      nota: "Los sueños ya aprobados y pagados que tienen fecha de salida pero todavía no abrieron. Dice cuándo abre cada uno.",
     },
     {
       sel: "#screen-garantia",
       estado: "maqueta",
-      titulo: "Hacer una oferta",
-      nota: "Ofertar todavía no está conectado. Es lo último que queda del pedido.",
+      titulo: "Garantía de subasta",
+      nota: "Pantalla de la maqueta que cobraba $10.000 antes de dejarte ofertar. Quedó fuera de uso: no estaba en el pedido y ofertar es un solo paso. La pantalla sigue en el código pero no se llega a ella.",
     },
     {
       sel: "#screen-apoyo",
@@ -114,12 +114,10 @@
 
   // Datos sueltos dentro de la portada: son números chicos, no pantallas, así
   // que se marcan con una etiqueta al lado en vez de un cartel arriba.
-  var DATOS = [
-    { sel: "#datoSubastas", estado: "maqueta", nota: "Cuenta sueños inventados." },
-    { sel: "#datoLotes", estado: "maqueta", nota: "Cuenta sueños inventados." },
-    { sel: "#datoEventos", estado: "maqueta", nota: "Cuenta los eventos de la maqueta, no los reales." },
-    { sel: "#datoFund", estado: "maqueta", nota: "Cuenta las fundaciones de la maqueta, no las reales." },
-  ];
+  // Los cuatro números de la portada ya cuentan datos reales, así que no hay
+  // nada suelto que marcar. Se deja la lista vacía a propósito: si mañana
+  // vuelve a aparecer un dato inventado en pantalla, se agrega acá.
+  var DATOS = [];
 
   var COLORES = {
     real: { fondo: "#0f3d2e", borde: "#34d399", texto: "#a7f3d0", rotulo: "FUNCIONA DE VERDAD" },
