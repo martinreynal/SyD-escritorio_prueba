@@ -5124,13 +5124,13 @@ body:not(.es-fundacion) #screen-avisos .aviso__cta{margin-top:8px}
       <div class="alert" id="loginAlert"></div>
       <div class="campo-neon">
         <label for="mail">Correo electrónico</label>
-        <input id="mail" type="text" value="demo@gmail.com" autocomplete="username"
+        <input id="mail" type="text" autocomplete="username"
                spellcheck="false" placeholder="tu@email.com">
       </div>
       <div class="campo-neon">
         <label for="pass">Contraseña</label>
         <div class="campo-clave">
-          <input id="pass" type="password" value="demo1234" autocomplete="current-password" placeholder="Tu contraseña">
+          <input id="pass" type="password" autocomplete="current-password" placeholder="Tu contraseña">
           <button type="button" class="ojo" id="verClave" aria-label="Mostrar contraseña">
             <svg class="ojo__ver" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
               <path d="M2.6 12S6.2 5.6 12 5.6 21.4 12 21.4 12 17.8 18.4 12 18.4 2.6 12 2.6 12z"/>
@@ -5797,10 +5797,16 @@ function leerArchivo(input, cb){
 var uid = 0;
 function nid(p){ uid++; return p + uid; }
 
-// Beta: modo demostración. Nada frena la navegación y todo se simula.
-var DEMO = true;
+// Modo demostración de la maqueta: salteaba el pedido de inicio de sesión,
+// aceptaba formularios vacíos completándolos con datos de ejemplo y permitía
+// ofertar por debajo del mínimo. Queda apagado: el sistema es real y el
+// pedido del cliente es explícito en que hace falta cuenta para donar,
+// subastar o publicar un sueño.
+var DEMO = false;
 var SCROLL_NATIVO = true;   // los carruseles se recorren con el dedo
-var saltarPasos = true;
+// Atajo de la demo que mostraba en pantalla el código de verificación y
+// permitía saltearlo. Con mail real andando, no corresponde.
+var saltarPasos = false;
 
 var DB = { fundaciones:[], donaciones:[], solicitudes:[], aportes:[], posts:[], avisos:[],
            suscripciones:[], invitaciones:[], complementarios:[], usuarios:[],
@@ -10824,9 +10830,11 @@ function borrarSueno(did){
 // fundación. En la beta los datos de tarjeta están congelados.
 var GARANTIA = 10000;
 
-// Interruptor del modo fundación. En false, la app entra siempre como
-// donante; toda la interfaz de fundación queda en el código, sin acceso.
-var MODO_FUNDACION = true;
+// Lo único que gobierna hoy este interruptor es el atajo de la demo que
+// permitía deslizar el campo de mail de la portada para alternar entre las
+// tres cuentas de ejemplo (donante, fundación, administración). Apagado: en
+// un sistema real cada uno escribe su mail.
+var MODO_FUNDACION = false;
 
 // Mails con los que se entra a cada rol en la demo. El campo de la portada los
 // alterna al deslizarlo. Definidos acá para que el deslizador y el botón de
@@ -12336,7 +12344,7 @@ function avanzarAporte(){
   }
 
   if(aporte.modo === "propuesta"){
-    if(!exigirSesion("publicar tu deseo")) return;
+    if(!exigirSesion("publicar tu sueño")) return;
     var titulo = aporte.titulo, texto = aporte.texto;
     if(DEMO){
       if(!titulo) titulo = "Mi deseo de prueba";
@@ -13325,7 +13333,7 @@ document.addEventListener("click", function(e){
   if(e.target.closest("#btnAnonimo")) return alternarAnonimo();
   if(e.target.closest("#btnInvitar")) return modalInvitar();
   if(e.target.closest("#upSalir")){
-    cerrarModal(); SyD.auth.cerrarSesion(); sesion = null; pintarTodo(); abrirLogin();
+    cerrarModal(); SyD.auth.cerrarSesion(); sesion = null; pintarTodo(); mostrarApp();
     toast("Cerraste sesión.");
     return;
   }
@@ -13333,7 +13341,7 @@ document.addEventListener("click", function(e){
     SyD.auth.cerrarSesion();
     sesion = null;
     pintarTodo();
-    abrirLogin();
+    mostrarApp();
     toast("Cerraste sesión.");
     return;
   }
@@ -13441,7 +13449,7 @@ function salirDeAdmin(){
   sesion = null;
   document.body.classList.remove("es-admin");
   pintarTodo();
-  abrirLogin();
+  mostrarApp();
   toast("Cerraste sesión.");
 }
 
@@ -13952,16 +13960,19 @@ try { pintarTodo(); } catch(err){}
 })();
 
 // Sesión real: si ya había una guardada (o Google nos acaba de redirigir de
-// vuelta con una), entramos directo. Si no, se ve la portada de acceso —
-// como pide el cliente, no hace falta cuenta para solo mirar la web.
+// vuelta con una), entramos directo. Si no, se abre igual la web pública:
+// el pedido del cliente es explícito en que el inicio de sesión hace falta
+// únicamente para donar, subastar o publicar un sueño — mirar es libre. El
+// login se pide recién al confirmar una de esas acciones (ver
+// exigirSesion), o tocando "Mi perfil".
 (async function iniciarSesionReal(){
   try {
     var sesionSb = await SyD.auth.sesionActual();
     if(sesionSb){ await entrarConSesionReal(); }
-    else { abrirLogin(); }
+    else { mostrarApp(); }
   } catch(err) {
     console.error("[SyD] Error al iniciar sesión:", err);
-    abrirLogin();
+    mostrarApp();
   }
 })();
 
@@ -13978,7 +13989,7 @@ SyD.auth.onCambioDeSesion(function(sesionSb){
   } else if(!sesionSb && sesion){
     sesion = null;
     pintarTodo();
-    abrirLogin();
+    mostrarApp();
   }
 });
 // Cierre: se vuelve a fijar la pestaña del menú y se remide, ya con todo
