@@ -145,14 +145,32 @@
     publicar: function (datos) {
       return post("/suenos", datos);
     },
-    // admin
-    listarPendientes: function () {
-      return get("/suenos/admin/pendientes");
+    // Los sueños de quien está mirando, con su estado y —si le toca pagar el
+    // fee— los datos para transferir.
+    mios: function () {
+      return get("/suenos/mios");
     },
-    // Al aprobar se define la subasta del sueño: fecha de inicio, fecha de
-    // caducidad y precio base. Sin eso el backend rechaza la aprobación.
-    aprobar: function (id, datos) {
-      return post("/suenos/admin/" + id + "/aprobar", datos);
+    // Informar que ya se transfirió el fee. `archivo` es el comprobante como
+    // data URL (lo que devuelve un <input type="file"> leído con FileReader).
+    informarPago: function (id, datos) {
+      return post("/suenos/" + id + "/fee/comprobante", datos);
+    },
+
+    // ── admin ──────────────────────────────────────────────────────────
+    // Todo lo que el admin tiene pendiente, en sus tres momentos:
+    // esperando revisión, esperando el pago, y con el comprobante subido.
+    listarEnProceso: function () {
+      return get("/suenos/admin/en-proceso");
+    },
+    // Paso 1: aceptar el contenido. No pide fechas — el sueño queda
+    // esperando que la persona pague el fee.
+    aprobar: function (id) {
+      return post("/suenos/admin/" + id + "/aprobar");
+    },
+    // Paso 2: verificado el comprobante, sale a subasta. Acá sí van las
+    // fechas y el precio base.
+    publicar: function (id, datos) {
+      return post("/suenos/admin/" + id + "/publicar", datos);
     },
     rechazar: function (id, motivo) {
       return post("/suenos/admin/" + id + "/rechazar", { motivo: motivo });

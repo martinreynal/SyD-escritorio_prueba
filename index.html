@@ -7948,6 +7948,14 @@ function pintarPanelUsuario(){
      '</div>'+
    '</div>'+
 
+   '<button class="fila-op" id="btnMisSuenos">'+
+     '<span class="fila-op__ico">'+
+       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">'+
+       '<path d="M12 3.4l2.5 5.1 5.6.8-4 4 .9 5.6-5-2.7-5 2.7.9-5.6-4-4 5.6-.8z"/></svg></span>'+
+     '<span class="fila-op__t"><b>Mis sueños</b><span>En qué quedó cada uno y qué falta</span></span>'+
+     '<span class="fila-op__chev">&#8250;</span>'+
+   '</button>'+
+
    '<button class="fila-op" data-stats="usuario">'+
      '<span class="fila-op__ico">'+
        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round">'+
@@ -13354,6 +13362,7 @@ document.addEventListener("click", function(e){
   // ---- panel de administración ----
   if((t = e.target.closest("[data-adm]"))){ adminSeccion = t.dataset.adm; pintarAdmin(); return; }
   if((t = e.target.closest("[data-aprobar]"))) return aprobarSueno(t.dataset.aprobar);
+  if((t = e.target.closest("[data-publicar]"))) return publicarSueno(t.dataset.publicar);
   if((t = e.target.closest("[data-rechazar]"))) return rechazarSueno(t.dataset.rechazar);
   if((t = e.target.closest("[data-abrir-subasta]"))) return abrirSubastaDeSueno(t.dataset.abrirSubasta);
   if((t = e.target.closest("[data-pausar]"))) return pausarSubastaDeSueno(t.dataset.pausar);
@@ -13500,6 +13509,8 @@ document.addEventListener("click", function(e){
   if((t = e.target.closest("[data-ver-deseo]"))) return modalDeseo(t.dataset.verDeseo);
   if(e.target.closest("#btnAnonimo")) return alternarAnonimo();
   if(e.target.closest("#btnInvitar")) return modalInvitar();
+  if(e.target.closest("#btnMisSuenos")) return modalMisSuenos();
+  if((t = e.target.closest("[data-pagar-fee]"))) return modalPagarFee(t.dataset.pagarFee);
   if(e.target.closest("#upSalir")){
     cerrarModal(); SyD.auth.cerrarSesion(); sesion = null; pintarTodo(); mostrarApp();
     toast("Cerraste sesión.");
@@ -13948,10 +13959,9 @@ function pintarTabsAdmin(){
   var secciones = [
     ["suenos", "Sueños", suenosPendientesCount],
     ["solicitudes", "Solicitudes", solicitudesFundacionPendientesCount],
-    ["usuarios", "Usuarios", 0],
+    ["usuarios", "CRM", 0],
     ["fundaciones", "Fundaciones", 0],
-    ["eventos", "Eventos", 0],
-    ["auditoria", "Auditoría", 0]
+    ["eventos", "Eventos", 0]
   ];
   tabs.innerHTML = secciones.map(function(sx){
     return '<button class="adm-tab'+(adminSeccion===sx[0]?' is-on':'')+'" data-adm="'+sx[0]+'">'+
@@ -13996,40 +14006,11 @@ function pintarAdmin(){
     return;
   }
 
-  // ---- auditoría (real, contra el backend) ----
-  caja.innerHTML = '<p class="rec-nota">Cada decisión administrativa queda registrada con su '+
-    'responsable y su hora.</p><p class="rec-nota">Cargando…</p>';
-  cargarAuditoriaAdmin(caja);
+  // Las secciones de arriba cubren todo el panel. El registro de acciones
+  // administrativas se sigue guardando en la base (quién aprobó qué y
+  // cuándo), pero ya no se muestra como pestaña: no estaba en el pedido.
 }
 
-async function cargarAuditoriaAdmin(caja){
-  var eventos;
-  try {
-    eventos = await SyD.admin.auditoria();
-  } catch(err) {
-    caja.innerHTML = '<p class="rec-nota">No pudimos cargar la auditoría: '+esc(err.message)+'</p>';
-    return;
-  }
-  if(adminSeccion !== "auditoria") return; // se cambió de pestaña mientras cargaba
-
-  caja.innerHTML =
-    '<p class="rec-nota">Cada decisión administrativa queda registrada con su '+
-      'responsable y su hora.</p>'+
-    (eventos.length
-      ? eventos.map(function(a){
-          var f = new Date(a.createdAt);
-          var quien = a.admin ? (a.admin.nombre+" "+a.admin.apellido) : "—";
-          return '<div class="adm-audit">'+
-            '<span class="adm-audit__h">'+("0"+f.getDate()).slice(-2)+"/"+
-              ("0"+(f.getMonth()+1)).slice(-2)+" "+
-              ("0"+f.getHours()).slice(-2)+":"+("0"+f.getMinutes()).slice(-2)+'</span>'+
-            '<span class="adm-audit__t"><b>'+esc(a.accion)+'</b>'+
-              '<span>'+esc(a.entidad)+(a.entidadId ? " · "+esc(a.entidadId) : "")+'</span>'+
-              (a.detalle ? '<span>'+esc(a.detalle)+'</span>' : '')+'</span>'+
-            '<span class="adm-audit__q">'+esc(quien)+'</span></div>';
-        }).join("")
-      : '<div class="empty">Todavía no hay acciones registradas.</div>');
-}
 
 // ---- decisiones sobre un sueño ----
 // ── Panel de administración: sueños contra la API real ──────────────────
@@ -14038,87 +14019,248 @@ async function cargarAuditoriaAdmin(caja){
 // es "acepto o cancelo", no llevar un archivo de rechazos.
 var suenosPendientesCount = 0;
 async function cargarSuenosAdmin(caja){
-  var pendientes, publicados;
+  var enProceso, publicados;
   try {
-    pendientes = await SyD.suenos.listarPendientes();
+    enProceso = await SyD.suenos.listarEnProceso();
     publicados = await SyD.suenos.listarPublicos();
   } catch(err) {
     caja.innerHTML = '<p class="rec-nota">No pudimos cargar los sueños: '+esc(err.message)+'</p>';
     return;
   }
-  suenosPendientesCount = pendientes.length;
-  pintarTabsAdmin();
   if(adminSeccion !== "suenos") return; // se cambió de pestaña mientras cargaba
 
+  var porRevisar = enProceso.filter(function(x){ return x.estado === "PENDIENTE"; });
+  var esperandoPago = enProceso.filter(function(x){ return x.estado === "ESPERANDO_PAGO"; });
+  var conComprobante = enProceso.filter(function(x){ return x.estado === "PAGO_INFORMADO"; });
+  // El número de la pestaña avisa de lo que necesita una decisión: revisar el
+  // contenido o mirar un comprobante. Los que están esperando que la persona
+  // pague no dependen del admin.
+  suenosPendientesCount = porRevisar.length + conComprobante.length;
+  pintarTabsAdmin();
+
   // El PDF pide que desde el panel se vea quién es el soñador y sus datos
-  // para poder contactarlo: por eso acá van mail y teléfono, que no salen
-  // en ninguna pantalla pública.
-  function fichaPendiente(x){
+  // para poder contactarlo: por eso acá van mail y teléfono, que no salen en
+  // ninguna pantalla pública.
+  function quien(x){
     var s = x.sonador || {};
     var contacto = [s.email, s.telefono].filter(Boolean).join(" · ");
+    return '<p class="adm-sueno__q">Lo pidió '+
+      esc(((s.nombre||"")+" "+(s.apellido||"")).trim() || "—")+
+      (x.fundacion ? ' · a beneficio de '+esc(x.fundacion.nombre) : '')+'</p>'+
+      (contacto ? '<p class="adm-sueno__q">'+esc(contacto)+'</p>' : '');
+  }
+
+  function ficha(x, etiqueta, clase, cuerpo, acciones){
     return '<div class="adm-sueno">'+
       '<div class="adm-sueno__t"><b>'+esc(x.titulo)+'</b>'+
-        '<span class="adm-estado es-pendiente">Esperando</span></div>'+
-      '<p class="adm-sueno__q">Lo pidió '+esc(((s.nombre||"")+" "+(s.apellido||"")).trim() || "—")+
-        (x.fundacion ? ' · a beneficio de '+esc(x.fundacion.nombre) : '')+'</p>'+
-      (contacto ? '<p class="adm-sueno__q">'+esc(contacto)+'</p>' : '')+
-      '<p class="adm-sueno__d">'+esc(x.descripcion)+'</p>'+
-      '<div class="adm-sueno__acc">'+
-        '<button class="btn btn--primary btn--sm" data-aprobar="'+x.id+'">Aceptar y programar</button>'+
-        '<button class="btn btn--ghost btn--sm" data-rechazar="'+x.id+'">Cancelar</button>'+
-      '</div>'+
+        '<span class="adm-estado '+clase+'">'+etiqueta+'</span></div>'+
+      quien(x)+
+      (cuerpo || '')+
+      (acciones ? '<div class="adm-sueno__acc">'+acciones+'</div>' : '')+
     '</div>';
   }
 
-  function fichaPublicado(x){
-    var sub = (x.subastas || [])[0];
-    var mejor = sub && (sub.ofertas || [])[0];
-    return '<div class="adm-sueno">'+
-      '<div class="adm-sueno__t"><b>'+esc(x.titulo)+'</b>'+
-        '<span class="adm-estado es-en-subasta">En subasta</span></div>'+
-      '<p class="adm-sueno__q">Lo pidió '+
-        esc(((x.sonador&&x.sonador.nombre||"")+" "+(x.sonador&&x.sonador.apellido||"")).trim() || "—")+
-        (x.fundacion ? ' · a beneficio de '+esc(x.fundacion.nombre) : '')+'</p>'+
-      (sub
-        ? '<p class="adm-sueno__m">'+pesos(Number(sub.precioInicial))+' de base'+
-          (mejor ? ' · '+pesos(Number(mejor.monto))+' ofertado' : ' · sin ofertas todavía')+
-          ' · del '+fechaCorta(sub.fechaInicio)+' al '+fechaCorta(sub.fechaFin)+'</p>'
-        : '')+
-    '</div>';
+  function bloque(titulo, lista, vacio, pintar){
+    return '<p class="frotulo">'+titulo+' ('+lista.length+')</p>'+
+      (lista.length ? lista.map(pintar).join("") : '<div class="empty">'+vacio+'</div>');
   }
 
   caja.innerHTML =
-    '<p class="rec-nota">Ningún sueño sale a subasta solo: primero lo aceptás acá, '+
-      'y al aceptarlo definís cuándo abre y cuándo cierra.</p>'+
+    '<p class="rec-nota">Un sueño pasa por dos controles: primero aceptás el contenido, '+
+      'y después verificás que haya pagado el fee. Recién ahí sale a subasta y elegís '+
+      'cuándo abre y cuándo cierra.</p>'+
 
-    '<p class="frotulo">Esperando que decidas ('+pendientes.length+')</p>'+
-    (pendientes.length
-      ? pendientes.map(fichaPendiente).join("")
-      : '<div class="empty">No hay sueños esperando.</div>')+
+    bloque("Esperando que revises el contenido", porRevisar,
+      "No hay sueños esperando revisión.", function(x){
+        return ficha(x, "Sin revisar", "es-pendiente",
+          '<p class="adm-sueno__d">'+esc(x.descripcion)+'</p>',
+          '<button class="btn btn--primary btn--sm" data-aprobar="'+x.id+'">Aceptar</button>'+
+          '<button class="btn btn--ghost btn--sm" data-rechazar="'+x.id+'">Rechazar</button>');
+      })+
 
-    '<p class="frotulo">En subasta ('+publicados.length+')</p>'+
-    (publicados.length
-      ? publicados.map(fichaPublicado).join("")
-      : '<div class="empty">No hay subastas abiertas.</div>');
+    bloque("Esperando que paguen el fee", esperandoPago,
+      "Nadie está debiendo el fee.", function(x){
+        var c = x.cobroDelFee || {};
+        return ficha(x, "Sin pagar", "es-por-subastar",
+          '<p class="adm-sueno__m">Tiene que transferir '+pesos(c.monto||0)+
+            (c.datos ? ' a: '+esc(c.datos) : ' — esta fundación no tiene cargado dónde cobrar el fee')+'</p>',
+          '<button class="btn btn--ghost btn--sm" data-rechazar="'+x.id+'">Rechazar</button>');
+      })+
+
+    bloque("Comprobantes para verificar", conComprobante,
+      "No hay comprobantes esperando.", function(x){
+        var c = x.cobroDelFee || {};
+        return ficha(x, "Pagó · falta verificar", "es-en-subasta",
+          '<p class="adm-sueno__m">Dice haber transferido '+pesos(c.monto||0)+
+            (x.feeReferencia ? ' · operación '+esc(x.feeReferencia) : '')+
+            (x.feeInformadoEn ? ' · el '+fechaCorta(x.feeInformadoEn) : '')+'</p>',
+          (x.comprobanteVer
+            ? '<a class="btn btn--ghost btn--sm" href="'+esc(x.comprobanteVer)+'" target="_blank" rel="noopener">Ver comprobante</a>'
+            : '<span class="field__hint">No subió archivo, solo el número de operación.</span>')+
+          '<button class="btn btn--primary btn--sm" data-publicar="'+x.id+'">Verificado: publicar</button>'+
+          '<button class="btn btn--ghost btn--sm" data-rechazar="'+x.id+'">Rechazar</button>');
+      })+
+
+    bloque("En subasta", publicados, "No hay subastas abiertas.", function(x){
+      var sub = (x.subastas || [])[0];
+      var mejor = sub && (sub.ofertas || [])[0];
+      return '<div class="adm-sueno">'+
+        '<div class="adm-sueno__t"><b>'+esc(x.titulo)+'</b>'+
+          '<span class="adm-estado es-activa">En subasta</span></div>'+
+        '<p class="adm-sueno__q">Lo pidió '+
+          esc(((x.sonador&&x.sonador.nombre||"")+" "+(x.sonador&&x.sonador.apellido||"")).trim() || "—")+
+          (x.fundacion ? ' · a beneficio de '+esc(x.fundacion.nombre) : '')+'</p>'+
+        (sub
+          ? '<p class="adm-sueno__m">'+pesos(Number(sub.precioInicial))+' de base'+
+            (mejor ? ' · '+pesos(Number(mejor.monto))+' ofertado' : ' · sin ofertas todavía')+
+            ' · del '+fechaCorta(sub.fechaInicio)+' al '+fechaCorta(sub.fechaFin)+'</p>'
+          : '')+
+      '</div>';
+    });
 }
 
-// Aceptar el sueño y, en el mismo paso, programar su subasta. Es el
-// circuito que pidió el cliente: acepto y quedan puestas las dos fechas.
-function aprobarSueno(id){
+// ── Mis sueños: en qué quedó cada uno ───────────────────────────────────
+// Publicar un sueño no termina al publicarlo: hay que esperar la revisión y,
+// si la pasa, transferir el fee. Sin una pantalla donde ver eso, la persona
+// se queda sin saber qué pasó con su sueño.
+var ESTADO_SUENO = {
+  PENDIENTE:      {txt:"Esperando revisión", clase:"es-pendiente",
+                   dice:"Lo estamos revisando. Te avisamos por mail cuando haya novedades."},
+  ESPERANDO_PAGO: {txt:"Aceptado · falta pagar", clase:"es-por-subastar",
+                   dice:"¡Lo aceptaron! Para que salga a subasta falta transferir el fee."},
+  PAGO_INFORMADO: {txt:"Comprobante enviado", clase:"es-en-subasta",
+                   dice:"Recibimos tu comprobante. Lo están verificando."},
+  APROBADO:       {txt:"En subasta", clase:"es-activa",
+                   dice:"Tu sueño ya está publicado y recibiendo ofertas."},
+  RECHAZADO:      {txt:"Rechazado", clase:"es-rechazado", dice:""}
+};
+
+async function modalMisSuenos(){
+  if(!exigirSesion("ver tus sueños")) return;
+  abrirModal({eyebrow:"Tus sueños", titulo:"Mis sueños", ancho:"grande",
+    body:'<p class="rec-nota">Cargando…</p>', ok:false});
+
+  var suenos;
+  try {
+    suenos = await SyD.suenos.mios();
+  } catch(err) {
+    $("#modalBody").innerHTML = '<p class="rec-nota">No pudimos cargarlos: '+esc(err.message)+'</p>';
+    return;
+  }
+
+  $("#modalBody").innerHTML = suenos.length === 0
+    ? '<div class="empty">Todavía no publicaste ningún sueño.</div>'
+    : suenos.map(function(x){
+        var e = ESTADO_SUENO[x.estado] || {txt:x.estado, clase:"", dice:""};
+        var c = x.cobroDelFee || {};
+        return '<div class="adm-sueno">'+
+          '<div class="adm-sueno__t"><b>'+esc(x.titulo)+'</b>'+
+            '<span class="adm-estado '+e.clase+'">'+e.txt+'</span></div>'+
+          (x.fundacion ? '<p class="adm-sueno__q">A beneficio de '+esc(x.fundacion.nombre)+'</p>' : '')+
+          (x.estado === "RECHAZADO" && x.motivoRechazo
+            ? '<p class="adm-sueno__d">'+esc(x.motivoRechazo)+'</p>'
+            : '<p class="adm-sueno__d">'+esc(e.dice)+'</p>')+
+          (x.estado === "ESPERANDO_PAGO"
+            ? '<div class="adm-sueno__acc">'+
+                '<button class="btn btn--primary btn--sm" data-pagar-fee="'+x.id+'">'+
+                'Pagar '+pesos(c.monto||0)+' y subir comprobante</button></div>'
+            : '')+
+          (x.estado === "PAGO_INFORMADO"
+            ? '<div class="adm-sueno__acc">'+
+                '<button class="btn btn--ghost btn--sm" data-pagar-fee="'+x.id+'">'+
+                'Cambiar el comprobante</button></div>'
+            : '')+
+        '</div>';
+      }).join("");
+}
+
+// Transferir el fee y subir el comprobante. Acá no se cobra nada: se muestran
+// los datos de la fundación para transferir por fuera, y se guarda lo que la
+// persona sube para que el admin lo verifique.
+async function modalPagarFee(id){
+  var suenos;
+  try { suenos = await SyD.suenos.mios(); } catch(err) { toast(err.message); return; }
+  var x = suenos.filter(function(s){ return s.id === id; })[0];
+  if(!x) return;
+  var c = x.cobroDelFee || {};
+  var archivo = null;
+
+  abrirModal({
+    eyebrow:"Tu sueño fue aceptado", titulo:"Pagar el fee de subasta", ancho:"grande",
+    body:
+      '<p class="field__hint">Para que <b>'+esc(x.titulo)+'</b> salga a subasta hay que '+
+        'transferir <b>'+pesos(c.monto||0)+'</b>'+
+        (x.fundacion ? ' a <b>'+esc(x.fundacion.nombre)+'</b>' : '')+
+        '. La plata va directo a la fundación: Soñá y Doná no la recibe ni la retiene.</p>'+
+      (c.datos
+        ? '<div class="field"><label>Dónde transferir</label>'+
+          '<p style="font-size:17px;font-weight:700;word-break:break-all">'+esc(c.datos)+'</p></div>'
+        : '<p class="field__hint">Esta fundación todavía no cargó dónde recibir el fee. '+
+          'Escribinos y lo resolvemos.</p>')+
+      '<div class="field"><label for="pfArchivo">Comprobante de la transferencia</label>'+
+        '<input id="pfArchivo" type="file" accept="image/*,application/pdf">'+
+        '<p class="field__hint">Una foto o captura, o el PDF que da el banco. Hasta 4 MB.</p></div>'+
+      campo("pfRef","Número de operación (opcional)","text","Ej. TRF-884521"),
+    ok: c.datos ? "Ya transferí" : false,
+    after:function(){
+      var inp = $("#pfArchivo");
+      if(inp) inp.addEventListener("change", function(){
+        var f = inp.files && inp.files[0];
+        if(!f){ archivo = null; return; }
+        if(f.size > 4*1024*1024){ toast("El comprobante no puede pesar más de 4 MB."); inp.value=""; return; }
+        var r = new FileReader();
+        r.onload = function(){ archivo = r.result; };
+        r.readAsDataURL(f);
+      });
+    },
+    onOk:async function(){
+      var ref = val("pfRef");
+      if(!archivo && !ref){
+        toast("Subí el comprobante o cargá el número de operación."); return;
+      }
+      try {
+        await SyD.suenos.informarPago(id, {archivo: archivo || undefined, referencia: ref || undefined});
+        cerrarModal();
+        toast("Listo. Lo van a verificar y después tu sueño sale a subasta.");
+      } catch(err) {
+        toast(err.message);
+      }
+    }
+  });
+}
+
+// Paso 1: aceptar el contenido. No pide fechas — el sueño pasa a esperar que
+// la persona transfiera el fee.
+async function aprobarSueno(id){
+  try {
+    var r = await SyD.suenos.aprobar(id);
+    var c = r.cobroDelFee || {};
+    toast(c.datos
+      ? "Aceptado. Ahora tiene que transferir "+pesos(c.monto||0)+" para que salga a subasta."
+      : "Aceptado, pero esta fundación no tiene cargado dónde cobrar el fee — cargáselo en Fundaciones.");
+    pintarAdmin();
+  } catch(err) {
+    toast(err.message);
+  }
+}
+
+// Paso 2: verificado el comprobante, el sueño sale a subasta. Las fechas van
+// acá y no al aceptar: entre una cosa y la otra pueden pasar días.
+function publicarSueno(id){
   var hoy = new Date();
   var enUnMes = new Date(hoy.getTime() + 30*24*60*60*1000);
   function comoFecha(d){ return d.toISOString().slice(0,10); }
 
   abrirModal({
-    eyebrow:"Sueños", titulo:"Aceptar y programar la subasta",
-    sub:"Al aceptarlo, el sueño sale público y su subasta queda abierta entre estas dos fechas.",
+    eyebrow:"Sueños", titulo:"Publicar y programar la subasta",
+    sub:"El pago ya está verificado. Al publicarlo, la subasta queda abierta entre estas dos fechas.",
     body:
       campo("apDesde","Fecha de inicio","date","")+
       campo("apHasta","Fecha de caducidad","date","")+
       campoPesos("apBase","Precio base de la subasta","")+
       campoPesos("apInc","Incremento mínimo entre ofertas (opcional)","")+
       '<p class="field__hint">El precio base es desde cuánto arrancan las ofertas.</p>',
-    ok:"Aceptar el sueño",
+    ok:"Publicar el sueño",
     after:function(){
       $("#apDesde").value = comoFecha(hoy);
       $("#apHasta").value = comoFecha(enUnMes);
@@ -14132,14 +14274,14 @@ function aprobarSueno(id){
         toast("La fecha de caducidad tiene que ser posterior a la de inicio."); return;
       }
       try {
-        await SyD.suenos.aprobar(id, {
+        await SyD.suenos.publicar(id, {
           fechaInicio: fechaAlMediodia(desde),
           fechaFin: fechaAlMediodia(hasta),
           precioInicial: base,
           incrementoMinimo: inc > 0 ? inc : undefined,
         });
         cerrarModal();
-        toast("Aceptado. La subasta queda abierta hasta el "+fechaCorta(hasta)+".");
+        toast("Publicado. La subasta queda abierta hasta el "+fechaCorta(hasta)+".");
         pintarAdmin();
       } catch(err) {
         toast(err.message);
