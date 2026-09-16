@@ -30,7 +30,7 @@
       sel: "#screen-admin",
       estado: "real",
       titulo: "Panel de administración",
-      nota: "Sus seis secciones trabajan contra la base de datos: Sueños, Solicitudes, Usuarios, Fundaciones, Eventos y Auditoría. Las pestañas Tablero y Finanzas de la maqueta se sacaron: mostraban cifras inventadas.",
+      nota: "Sus cinco secciones trabajan contra la base de datos: Sueños, Solicitudes, CRM, Fundaciones y Eventos. Sueños muestra los tres momentos del recorrido: revisar el contenido, esperar el pago del fee y verificar el comprobante. Las pestañas Tablero y Finanzas de la maqueta se sacaron: mostraban cifras inventadas.",
     },
     {
       sel: "#screen-fundaciones",
@@ -48,7 +48,7 @@
       sel: "#screen-aporte",
       estado: "mixto",
       titulo: "Contar tu sueño",
-      nota: "Publicar un sueño es real: queda esperando la aprobación del administrador, y lo que escribís no se pierde si tenés que iniciar sesión para publicarlo. Las otras formas de aportar (voluntariado, materiales, servicios) siguen siendo maqueta y no estaban en el pedido.",
+      nota: "Publicar un sueño es real: queda esperando la revisión del administrador, y lo que escribís no se pierde si tenés que iniciar sesión para publicarlo. Después, desde “Mis sueños” en el perfil, se ve en qué quedó y se paga el fee de $20.000 subiendo el comprobante. Las otras formas de aportar (voluntariado, materiales, servicios) siguen siendo maqueta y no estaban en el pedido.",
     },
     {
       sel: "#screen-registro",
@@ -60,7 +60,7 @@
       sel: "#screen-deseos",
       estado: "maqueta",
       titulo: "Subastas activas",
-      nota: "Los sueños en subasta y las ofertas son inventados. El motor de subastas está construido y probado del lado del servidor, incluido el control de que dos ofertas simultáneas nunca se pisen. Falta conectar esta pantalla, y antes hay que cerrar cómo se cobran los $20.000.",
+      nota: "Las subastas que se ven acá y sus ofertas son inventadas. El motor está construido y probado del lado del servidor, incluido el control de que dos ofertas simultáneas nunca se pisen, y el cobro del fee ya funciona de punta a punta. Falta conectar esta pantalla y la de ofertar.",
     },
     {
       sel: "#screen-subastas",
@@ -72,7 +72,7 @@
       sel: "#screen-garantia",
       estado: "maqueta",
       titulo: "Hacer una oferta",
-      nota: "Ofertar todavía no está conectado. Depende de la misma definición del cobro de $20.000.",
+      nota: "Ofertar todavía no está conectado. Es lo último que queda del pedido.",
     },
     {
       sel: "#screen-apoyo",
