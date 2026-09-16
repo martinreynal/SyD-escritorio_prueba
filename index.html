@@ -13832,6 +13832,21 @@ function modalEventoAdmin(){
 
 // Alta y edición de fundaciones, siempre contra el backend real. `f` es
 // la fundación a editar, o null/undefined para dar de alta una nueva.
+// Comprueba que una dirección muestre de verdad una imagen. Se hace cargándola
+// en serio y no mirando si termina en .png, porque muchos logos se sirven sin
+// extensión — y al revés, una dirección con pinta de imagen puede estar rota.
+function probarImagen(url){
+  return new Promise(function(listo){
+    var img = new Image();
+    var resuelto = false;
+    function responder(v){ if(!resuelto){ resuelto = true; listo(v); } }
+    img.onload = function(){ responder(true); };
+    img.onerror = function(){ responder(false); };
+    setTimeout(function(){ responder(false); }, 6000);  // sitio lento o caído
+    img.src = url;
+  });
+}
+
 function modalFundacionAdmin(f){
   var esNueva = !f;
   abrirModal({
@@ -13841,7 +13856,10 @@ function modalFundacionAdmin(f){
     body:
       campo("mfNombre","Nombre","text","") +
       campo("mfDescripcion","Descripción","textarea","") +
-      campo("mfLogo","URL del logo (opcional)","text","https://…") +
+      campo("mfLogo","Logo de la fundación (opcional)","text","https://…/logo.png",
+        '<p class="field__hint">Va la dirección de la <b>imagen</b>, no la del sitio. '+
+        'Se saca entrando al sitio de la fundación, haciendo clic derecho sobre el logo y '+
+        'eligiendo “Copiar dirección de la imagen”. Si lo dejás vacío se muestran las iniciales.</p>') +
       // Las dos ramas del alta. No son excluyentes a propósito: una misma
       // fundación puede recibir donaciones y además estar habilitada para
       // sueños y subastas.
@@ -13886,6 +13904,14 @@ function modalFundacionAdmin(f){
       if(paraSubasta && !linkFee){
         toast("Para publicarla en Sueños y subastas hace falta cargar cómo se le cobra el fee."); return;
       }
+      // El error más fácil de cometer acá es pegar la dirección del sitio de la
+      // fundación en vez de la de su logo. Se ve recién después, como un
+      // círculo vacío y sin ninguna explicación, así que conviene frenarlo acá.
+      var logo = val("mfLogo");
+      if(logo && !(await probarImagen(logo))){
+        toast("Esa dirección no muestra una imagen. Hacé clic derecho sobre el logo en el sitio de la fundación y elegí “Copiar dirección de la imagen”.");
+        return;
+      }
       var datos = {
         nombre: nombre,
         linkPago: link,
@@ -13893,7 +13919,7 @@ function modalFundacionAdmin(f){
         paraDonacion: paraDonacion,
         paraSubasta: paraSubasta,
         descripcion: val("mfDescripcion") || undefined,
-        logoUrl: val("mfLogo") || undefined,
+        logoUrl: logo || undefined,
         contactoEmail: val("mfMail") || undefined,
         contactoTelefono: val("mfTelefono") || undefined,
       };
