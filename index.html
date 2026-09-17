@@ -1565,6 +1565,9 @@ body.es-admin #screen-admin.is-active{display:block;height:auto}
 .adm-sueno__acc{display:flex;gap:8px;margin-top:11px}
 .adm-sueno__acc .btn{flex:1}
 
+/* Un botón que está esperando respuesta del servidor: se apaga y avisa. */
+.es-ocupado{opacity:.62;cursor:progress !important;pointer-events:none}
+
 /* Los pasos que siguen después de publicar un sueño. */
 .pasos-sueno{margin:4px 0 0;padding-left:20px;display:flex;flex-direction:column;gap:14px}
 .pasos-sueno li{color:var(--tinta)}
@@ -7605,6 +7608,7 @@ var carEventos = crearCarrusel({
 // pantallas de eventos de la maqueta (e.n, e.f, e.lugar, e.desc, e.fISO),
 // para no reescribir las tarjetas, los filtros ni el buscador.
 var eventosReales = [];
+var estadoEventos = "sin-pedir";
 
 function fechaLargaEvento(iso){
   var d = new Date(iso);
@@ -7614,10 +7618,15 @@ function fechaLargaEvento(iso){
 
 async function cargarEventosReales(){
   var lista;
+  estadoEventos = "pidiendo";
+  try { pintarEventos(); } catch(err){}
   try {
     lista = await pedirConReintentos(function(){ return SyD.eventos.listar(); });
+    estadoEventos = "listo";
   } catch(err) {
     eventosReales = [];
+    estadoEventos = "fallo";
+    try { pintarEventos(); } catch(e){}
     return;
   }
   eventosReales = lista.map(function(ev){
@@ -7794,7 +7803,10 @@ function pintarEventos(){
   caja.className = "fx-lista ev-lista" + (evEstado.vista === "una" ? " es-una" : "");
   caja.innerHTML = lista.length
     ? lista.map(tarjetaEvento).join("")
-    : '<div class="empty">No hay eventos con ese filtro.</div>';
+    : '<div class="empty">'+
+      (estadoEventos === "pidiendo" ? "Buscando actividades…"
+       : estadoEventos === "fallo" ? "No pudimos conectarnos. Revisá tu conexión y volvé a entrar."
+       : "No hay eventos con ese filtro.")+'</div>';
   $$("[data-efiltro]").forEach(function(b){ b.classList.toggle("is-on", b.dataset.efiltro === evEstado.filtro); });
   $$("[data-evista]").forEach(function(b){ b.classList.toggle("is-on", b.dataset.evista === evEstado.vista); });
 }
@@ -7906,7 +7918,10 @@ function pintarSubastas(){
   });
   var cont = $("#listaSubastas"), nav = $("#subastasNav");   // el paginador puede no existir
   if(!abiertas.length){
-    cont.innerHTML = '<div class="empty">No hay sueños esperando salir a subasta.</div>';
+    cont.innerHTML = '<div class="empty">'+
+      (estadoSubastas === "pidiendo" ? "Buscando sueños…"
+       : estadoSubastas === "fallo" ? "No pudimos conectarnos. Revisá tu conexión y volvé a entrar."
+       : "No hay sueños esperando salir a subasta.")+'</div>';
     if(nav) nav.innerHTML = "";
     return;
   }
@@ -8795,7 +8810,57 @@ function cerrarModal(){ $("#modal").classList.remove("is-open"); onOk = null; }
 $("#modalCancel").addEventListener("click", cerrarModal);
 $("#modal").addEventListener("click", function(e){ if(e.target===this) cerrarModal(); });
 document.addEventListener("keydown", function(e){ if(e.key==="Escape") cerrarModal(); });
-$("#modalOk").addEventListener("click", function(){ if(onOk) onOk(); });
+/**
+ * Deja un botón "ocupado" mientras corre algo que tarda: lo apaga, le pone
+ * un texto de espera y devuelve una función para devolverlo a como estaba.
+ *
+ * Existe porque casi todas las acciones de la web hablan con un servidor que
+ * puede tardar varios segundos —más todavía cuando está despertando— y sin
+ * esto el botón queda igual que antes: no se sabe si el clic entró, y la
+ * reacción natural es volver a apretar.
+ */
+function ocuparBoton(boton, textoEspera){
+  if(!boton) return function(){};
+  var antes = boton.innerHTML;
+  boton.disabled = true;
+  boton.classList.add("es-ocupado");
+  boton.textContent = textoEspera || "Procesando…";
+  return function liberar(){
+    boton.disabled = false;
+    boton.classList.remove("es-ocupado");
+    boton.innerHTML = antes;
+  };
+}
+
+/** Corre una acción que puede tardar, cuidando el botón que la disparó. */
+async function conEspera(boton, accion, textoEspera){
+  if(boton && boton.disabled) return;          // ya está corriendo
+  var liberar = ocuparBoton(boton, textoEspera);
+  try {
+    await accion();
+  } finally {
+    liberar();
+  }
+}
+
+// El botón de confirmar de los modales: si lo que hace es asincrónico,
+// se queda en "Procesando…" hasta que termine. Cubre de una sola vez todas
+// las pantallas que confirman algo contra el servidor.
+$("#modalOk").addEventListener("click", function(){
+  if(!onOk) return;
+  var boton = this;
+  if(boton.disabled) return;
+  var resultado;
+  try {
+    resultado = onOk();
+  } catch(err) {
+    return;
+  }
+  if(!resultado || typeof resultado.then !== "function") return;
+
+  var liberar = ocuparBoton(boton, "Procesando…");
+  resultado.then(function(){ liberar(); }, function(){ liberar(); });
+});
 
 // Campo de dinero: sin flechas, con "$" fijo adelante y separadores de miles.
 function campoPesos(id,label,ph,extra){
@@ -10794,17 +10859,23 @@ function seguirCarril(){ montarCarriles(); }
 // x.cierreISO), para no reescribir la tarjeta ni el reloj de cuenta regresiva.
 var subastasReales = [];
 var subastasProximas = [];
+var estadoSubastas = "sin-pedir";
 
 async function cargarSubastasReales(){
   var lista;
+  estadoSubastas = "pidiendo";
+  try { pintarListaDeseos(); pintarSubastas(); } catch(err){}
   try {
     var r = await pedirConReintentos(function(){
       return Promise.all([SyD.subastas.listar(), SyD.subastas.proximas()]);
     });
     lista = r[0];
     subastasProximas = r[1];
+    estadoSubastas = "listo";
   } catch(err) {
     subastasReales = []; subastasProximas = [];
+    estadoSubastas = "fallo";
+    try { pintarListaDeseos(); pintarSubastas(); } catch(e){}
     return;
   }
   subastasReales = lista.map(function(s){
@@ -10866,7 +10937,11 @@ function pintarListaDeseos(){
     // Vacío por búsqueda y vacío porque todavía no abrió ninguna subasta son
     // dos cosas distintas: la segunda no es un error, es el estado normal
     // mientras la administración decide cuáles salen.
-    : (q
+    : (estadoSubastas === "pidiendo"
+        ? '<div class="empty">Buscando subastas…</div>'
+      : estadoSubastas === "fallo"
+        ? '<div class="empty">No pudimos conectarnos. Revisá tu conexión y volvé a entrar.</div>'
+      : q
         ? '<div class="empty">No hay sueños que coincidan con esa búsqueda.</div>'
         : '<div class="esperando">'+
             '<span class="esperando__ico">'+
@@ -13605,7 +13680,7 @@ document.addEventListener("click", function(e){
   if((t = e.target.closest("[data-sueno-fund]"))) return modalDeseo(t.dataset.suenoFund);
   // ---- panel de administración ----
   if((t = e.target.closest("[data-adm]"))){ adminSeccion = t.dataset.adm; pintarAdmin(); return; }
-  if((t = e.target.closest("[data-aprobar]"))) return aprobarSueno(t.dataset.aprobar);
+  if((t = e.target.closest("[data-aprobar]"))) return conEspera(t, function(){ return aprobarSueno(t.dataset.aprobar); }, "Aceptando…");
   if((t = e.target.closest("[data-publicar]"))) return publicarSueno(t.dataset.publicar);
   if((t = e.target.closest("[data-rechazar]"))) return rechazarSueno(t.dataset.rechazar);
   if((t = e.target.closest("[data-abrir-subasta]"))) return abrirSubastaDeSueno(t.dataset.abrirSubasta);
@@ -13641,23 +13716,26 @@ document.addEventListener("click", function(e){
   }
   if((t = e.target.closest("[data-suspender-real]"))){
     var idSusp = t.dataset.suspenderReal, estaSuspendida = t.dataset.estado === "suspendida";
-    (estaSuspendida ? SyD.fundaciones.reactivar(idSusp) : SyD.fundaciones.suspender(idSusp))
-      .then(function(){
-        toast(estaSuspendida ? "Fundación reactivada." : "Fundación suspendida.");
-        pintarAdmin();
-      })
-      .catch(function(err){ toast(err.message); });
-    return;
+    return conEspera(t, function(){
+      return (estaSuspendida ? SyD.fundaciones.reactivar(idSusp) : SyD.fundaciones.suspender(idSusp))
+        .then(function(){
+          toast(estaSuspendida ? "Fundación reactivada." : "Fundación suspendida.");
+          return cargarFundacionesReales();
+        })
+        .then(function(){ pintarAdmin(); })
+        .catch(function(err){ toast(err.message); });
+    }, estaSuspendida ? "Reactivando…" : "Suspendiendo…");
   }
   if((t = e.target.closest("[data-atender-solicitud]"))){
     var idSol = t.dataset.atenderSolicitud, yaAtendida = t.dataset.atendida === "true";
-    SyD.solicitudesFundacion.marcarAtendida(idSol, !yaAtendida)
-      .then(function(){
-        toast(yaAtendida ? "Marcada como pendiente." : "Marcada como atendida.");
-        pintarAdmin();
-      })
-      .catch(function(err){ toast(err.message); });
-    return;
+    return conEspera(t, function(){
+      return SyD.solicitudesFundacion.marcarAtendida(idSol, !yaAtendida)
+        .then(function(){
+          toast(yaAtendida ? "Marcada como pendiente." : "Marcada como atendida.");
+          pintarAdmin();
+        })
+        .catch(function(err){ toast(err.message); });
+    }, "Guardando…");
   }
 
   if(e.target.closest("#apVolverSueno")){ aporte.paso = 0; pintarAporte(); return; }
