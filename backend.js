@@ -18,10 +18,14 @@
   var SUPABASE_ANON_KEY =
     "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhvd3d4bnJoemhud2F4c3lqc3R4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg3OTczMzksImV4cCI6MjEwNDM3MzMzOX0.zkRb4UNDhF7TAxPgOsc_AKghz7eCu-YeY0j0FhEzDbA";
 
-  // Mientras desarrollamos, la API vive en localhost. El día del deploy a
-  // Render, este valor pasa a ser la URL pública del backend (algo como
-  // https://syd-backend.onrender.com/api).
-  var API_BASE = "http://localhost:4000/api";
+  // El backend publicado en Render. Es el único punto donde el front sabe
+  // dónde vive la API: si algún día se muda de servidor, se cambia acá y en
+  // ningún otro lado.
+  //
+  // Para trabajar contra el backend de tu propia máquina, cambiá esta línea
+  // por "http://localhost:4000/api" (y acordate de volverla atrás antes de
+  // subir, o el sitio publicado va a quedar apuntando a tu computadora).
+  var API_BASE = "https://syd-backend-o8hi.onrender.com/api";
 
   if (!window.supabase) {
     console.error(
