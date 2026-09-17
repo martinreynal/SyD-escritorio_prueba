@@ -10021,7 +10021,10 @@ function pintarMuroApoyo(){
   var caja = $("#muroApoyo"); if(!caja) return;
   if(!sesion){ caja.innerHTML = '<div class="empty">Entrá con tu cuenta para ver tu actividad.</div>'; return; }
 
-  var mios = DB.solicitudes.filter(function(x){ return x.quien === sesion.nombre; });
+  // Los sueños propios son reales; el resto de esta pantalla (lo donado, los
+  // apoyos mensuales) sigue siendo de la maqueta porque el sistema no
+  // registra donaciones: van directo a la fundación.
+  var mios = misSuenosCache;
   var pujados = DB.solicitudes.filter(function(x){
     return x.quien !== sesion.nombre &&
       (x.ofertas||[]).some(function(o){ return o.quien === sesion.nombre; });
@@ -10060,10 +10063,18 @@ function pintarMuroApoyo(){
 
     '<div class="ap2-cab"><span class="ap2-rot">Tu actividad</span></div>'+
     '<div class="ap2-act">'+
-      tarjetaActividad("estrella", "Sueños publicados", mios.length,
-        mios.length ? "Seguí de cerca cómo avanzan tus sueños."
-                    : "Todavía no publicaste ningún sueño.<br>Contanos qué te gustaría hacer realidad.",
-        "Publicar un sueño", "publicar")+
+      // Mientras no llegó la respuesta no se afirma que no hay ninguno: decir
+      // "todavía no publicaste ningún sueño" a alguien que sí publicó es
+      // peor que no decir nada.
+      tarjetaActividad("estrella", "Sueños publicados",
+        misSuenosPedidos ? mios.length : "—",
+        !misSuenosPedidos
+          ? "Buscando tus sueños…"
+          : mios.length
+            ? "Mirá en qué quedó cada uno desde Mi perfil &rsaquo; Mis sueños."
+            : "Todavía no publicaste ningún sueño.<br>Contanos qué te gustaría hacer realidad.",
+        mios.length ? "Ver mis sueños" : "Publicar un sueño",
+        mios.length ? "mis-suenos" : "publicar")+
       tarjetaActividad("martillo", "Subastas participadas", pujados.length,
         pujados.length ? "Mirá cómo van las subastas donde ofertaste."
                        : "Todavía no ofertaste por ningún sueño.<br>Descubrí subastas y ayudá a que más sueños se cumplan.",
@@ -10449,7 +10460,15 @@ function pintarAvisos(){
     (lista.length ? '<p class="avisos__fin">Estás al día</p>' : '');
 }
 
-function abrirApoyo(){ abrirPantalla("screen-apoyo", pintarMuroApoyo); marcarTab("apoyo"); }
+function abrirApoyo(){
+  abrirPantalla("screen-apoyo", pintarMuroApoyo);
+  marcarTab("apoyo");
+  // Los sueños propios son un dato real: se piden al entrar y se redibuja
+  // cuando llegan, para no decir "no publicaste ninguno" teniéndolos.
+  cargarMisSuenos().then(function(){
+    try { if($("#screen-apoyo").classList.contains("is-active")) pintarMuroApoyo(); } catch(err){}
+  });
+}
 function abrirNosotros(){
   document.body.classList.add("es-listado");
   abrirPantalla("screen-nosotros", function(){
@@ -13490,6 +13509,7 @@ document.addEventListener("click", function(e){
     if(a2 === "fundaciones") abrirFundaciones();
     else if(a2 === "publicar") abrirPantallaAporte("propuesta");
     else if(a2 === "subastas") abrirDeseos();
+    else if(a2 === "mis-suenos") modalMisSuenos();
     return;
   }
   if(e.target.closest("#abrirBusca")){
@@ -14417,6 +14437,22 @@ async function cargarSuenosAdmin(caja){
 // Publicar un sueño no termina al publicarlo: hay que esperar la revisión y,
 // si la pasa, transferir el fee. Sin una pantalla donde ver eso, la persona
 // se queda sin saber qué pasó con su sueño.
+// Los sueños de quien está mirando. Se guardan acá porque los usan dos
+// pantallas: "Mis sueños" y el contador de "Tu actividad".
+var misSuenosCache = [];
+var misSuenosPedidos = false;   // ya llegó la respuesta al menos una vez
+
+async function cargarMisSuenos(){
+  if(!sesion) { misSuenosCache = []; misSuenosPedidos = true; return misSuenosCache; }
+  try {
+    misSuenosCache = await pedirConReintentos(function(){ return SyD.suenos.mios(); });
+  } catch(err) {
+    misSuenosCache = [];
+  }
+  misSuenosPedidos = true;
+  return misSuenosCache;
+}
+
 var ESTADO_SUENO = {
   PENDIENTE:      {txt:"Esperando revisión", clase:"es-pendiente",
                    dice:"Lo estamos revisando. Te avisamos por mail cuando haya novedades."},
@@ -14436,7 +14472,8 @@ async function modalMisSuenos(){
 
   var suenos;
   try {
-    suenos = await SyD.suenos.mios();
+    suenos = await pedirConReintentos(function(){ return SyD.suenos.mios(); });
+    misSuenosCache = suenos;
   } catch(err) {
     $("#modalBody").innerHTML = '<p class="rec-nota">No pudimos cargarlos: '+esc(err.message)+'</p>';
     return;
