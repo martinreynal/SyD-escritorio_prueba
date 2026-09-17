@@ -8809,6 +8809,38 @@ function formatearMiles(str){
   var n = String(str).replace(/[^\d]/g, "");
   return n ? Number(n).toLocaleString("es-AR") : "";
 }
+
+// Los campos de dinero se formatean mientras se escribe. Sin separadores,
+// 10000000 y 1000000 se confunden a simple vista, y acá se están cargando
+// montos de donaciones y de subastas: leer mal un cero es caro.
+//
+// Va como un solo escucha sobre todo el documento porque estos campos se
+// crean y se destruyen todo el tiempo dentro de los modales; enganchar cada
+// uno al nacer obligaría a acordarse en cada pantalla nueva.
+document.addEventListener("input", function(e){
+  var campo = e.target;
+  // Hay dos formas de campo de dinero en la web: la del ayudante campoPesos()
+  // y la de la pantalla de contar un sueño, que tiene su propia estructura.
+  // Las dos tienen que formatearse igual.
+  if(!campo || !campo.matches) return;
+  if(!campo.matches('.pesos input, .sn-monto input, input[inputmode="numeric"]')) return;
+
+  var antes = campo.value;
+  var formateado = formatearMiles(antes);
+  if(formateado === antes) return;
+
+  // Cuántos dígitos había antes del cursor: es lo que hay que respetar para
+  // que no salte de lugar al agregarse un punto.
+  var digitosAntes = antes.slice(0, campo.selectionStart || 0).replace(/\D/g, "").length;
+  campo.value = formateado;
+
+  var i = 0, vistos = 0;
+  while(i < formateado.length && vistos < digitosAntes){
+    if(/\d/.test(formateado.charAt(i))) vistos++;
+    i++;
+  }
+  try { campo.setSelectionRange(i, i); } catch(err){}
+});
 // Se aplica a cualquier campo de dinero que aparezca dentro del modal.
 document.addEventListener("input", function(e){
   if(!e.target.closest(".pesos")) return;
