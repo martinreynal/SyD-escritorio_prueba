@@ -6905,6 +6905,25 @@ var fundacionesDonacion = [], fundacionesSubasta = [];
 // la respuesta la pantalla dice "no encontramos fundaciones", que es mentira:
 // todavía no llegaron.
 var estadoFundaciones = "sin-pedir";
+
+// Reintenta un pedido a la API antes de darlo por perdido.
+//
+// Hace falta por dos motivos concretos de este sistema: el servidor gratuito
+// se duerme tras un rato sin uso y el primer pedido puede tardar casi un
+// minuto o fallar mientras despierta, y cada vez que se publica una versión
+// nueva el servidor se reinicia y deja de responder unos segundos. Sin esto,
+// quien justo entra en ese momento ve la web vacía y no se entera de nada.
+async function pedirConReintentos(pedido, intentos){
+  intentos = intentos || 3;
+  for (var i = 1; i <= intentos; i++) {
+    try {
+      return await pedido();
+    } catch (err) {
+      if (i === intentos) throw err;
+      await new Promise(function(sigue){ setTimeout(sigue, i * 4000); });
+    }
+  }
+}
 // La promesa de la primera carga: quien necesite las fundaciones ya listas
 // (por ejemplo, retomar un sueño a medio publicar) la espera en vez de
 // encontrarse con las listas todavía vacías.
@@ -6941,26 +6960,21 @@ async function cargarFundacionesReales(){
   // puede tardar casi un minuto o fallar mientras despierta. Por eso se
   // reintenta en vez de dar la lista por vacía: si no, el primero que entra
   // después de una pausa ve una web sin ninguna fundación, y no vuelve.
-  for (var intento = 1; intento <= 3; intento++) {
-    try {
-      var r = await Promise.all([
+  try {
+    var r = await pedirConReintentos(function(){
+      return Promise.all([
         SyD.fundaciones.listar("donacion"),
         SyD.fundaciones.listar("subasta")
       ]);
-      fundacionesDonacion = r[0].map(normalizarFundacion);
-      fundacionesSubasta = r[1].map(normalizarFundacion);
-      estadoFundaciones = "listo";
-      colgarEventosEnFundaciones();
-      try { pintarFundaciones(); } catch(err){}
-      return;
-    } catch(err) {
-      if (intento < 3) {
-        await new Promise(function(sigue){ setTimeout(sigue, intento * 4000); });
-      }
-    }
+    });
+    fundacionesDonacion = r[0].map(normalizarFundacion);
+    fundacionesSubasta = r[1].map(normalizarFundacion);
+    estadoFundaciones = "listo";
+  } catch(err) {
+    fundacionesDonacion = []; fundacionesSubasta = [];
+    estadoFundaciones = "fallo";
   }
-  fundacionesDonacion = []; fundacionesSubasta = [];
-  estadoFundaciones = "fallo";
+  colgarEventosEnFundaciones();
   try { pintarFundaciones(); } catch(err){}
 }
 
@@ -7595,7 +7609,7 @@ function fechaLargaEvento(iso){
 async function cargarEventosReales(){
   var lista;
   try {
-    lista = await SyD.eventos.listar();
+    lista = await pedirConReintentos(function(){ return SyD.eventos.listar(); });
   } catch(err) {
     eventosReales = [];
     return;
@@ -7672,26 +7686,6 @@ function abrirFormaDeCobro(valor, para){
   return true;
 }
 
-function tarjetaEvento(it){
-  var e = it.e, f = it.f;
-  var voy = sesion && estadoAsistencia(e) === "confirmada";
-  return '<article class="ecard">'+
-    '<div class="ecard__img" style="'+(e.imagen?'background-image:url('+e.imagen+')':'')+'"></div>'+
-    '<div class="ecard__body">'+
-      '<div class="ecard__fund"><span class="avatar" style="'+avatarCSS(f)+'">'+(f.foto?"":esc(iniciales(f.nombre)))+'</span>'+
-      '<span data-ir-fundacion="'+f.id+'" style="cursor:pointer">'+esc(f.nombre)+'</span></div>'+
-      '<div class="ecard__fecha">'+esc(e.f)+'</div>'+
-      '<div class="ecard__nombre">'+esc(e.n)+'</div>'+
-      '<div class="ecard__desc">'+esc(e.lugar)+(e.desc?' · '+esc(e.desc):'')+'</div>'+
-      '<div class="ecard__pie">'+
-        (puedeAportar()
-          ? '<button class="btn '+(voy?'btn--ghost':'btn--primary')+' btn--sm" data-asistir="'+e.id+'" data-fid="'+f.id+'">'+
-            (voy?'Asistencia confirmada':'Confirmar asistencia')+'</button>'
-          : '')+
-        '<button class="btn btn--ghost btn--sm" data-evento-mas="'+e.id+'" data-fid="'+f.id+'">Conocer más</button>'+
-      '</div>'+
-    '</div></article>';
-}
 
 // Estado de la pantalla de eventos: filtro de tiempo, lugar, sólo los míos,
 // texto buscado y forma de ver.
@@ -8668,7 +8662,8 @@ function pintarDatosMenu(){
   ponerN("datoEventos", eventos, eventos===1 ? "actividad próxima" : "actividades próximas");
   var prox = eventosReales.length ? eventosReales[0].e.f : null;
   pie("datoEventos", prox ? "La próxima · "+prox : "");
-  ponerN("datoFund", fundacionesDonacion.length, "fundaciones publicadas");
+  var cuantasFund = fundacionesDonacion.length;
+  ponerN("datoFund", cuantasFund, cuantasFund === 1 ? "fundación publicada" : "fundaciones publicadas");
 }
 
 function revisarMenuFijo(){
@@ -10746,8 +10741,11 @@ var subastasProximas = [];
 async function cargarSubastasReales(){
   var lista;
   try {
-    lista = await SyD.subastas.listar();
-    subastasProximas = await SyD.subastas.proximas();
+    var r = await pedirConReintentos(function(){
+      return Promise.all([SyD.subastas.listar(), SyD.subastas.proximas()]);
+    });
+    lista = r[0];
+    subastasProximas = r[1];
   } catch(err) {
     subastasReales = []; subastasProximas = [];
     return;
