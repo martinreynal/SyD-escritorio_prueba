@@ -6901,6 +6901,10 @@ function miFundacion(){ return esFundacion() ? DB.fundaciones.filter(function(f)
 // respuesta. Conviven con DB.fundaciones (las de la maqueta), que todavía
 // alimentan las pantallas que no están en el pedido del cliente.
 var fundacionesDonacion = [], fundacionesSubasta = [];
+// "sin-pedir" / "pidiendo" / "listo" / "fallo". Sin esto, mientras se espera
+// la respuesta la pantalla dice "no encontramos fundaciones", que es mentira:
+// todavía no llegaron.
+var estadoFundaciones = "sin-pedir";
 // La promesa de la primera carga: quien necesite las fundaciones ya listas
 // (por ejemplo, retomar un sueño a medio publicar) la espera en vez de
 // encontrarse con las listas todavía vacías.
@@ -6930,19 +6934,33 @@ function normalizarFundacion(f){
 }
 
 async function cargarFundacionesReales(){
-  try {
-    var r = await Promise.all([
-      SyD.fundaciones.listar("donacion"),
-      SyD.fundaciones.listar("subasta")
-    ]);
-    fundacionesDonacion = r[0].map(normalizarFundacion);
-    fundacionesSubasta = r[1].map(normalizarFundacion);
-    try { pintarFundaciones(); } catch(err){}
-  } catch(err) {
-    // Si el backend no responde, las pantallas que dependen de esto avisan
-    // por su cuenta. No rompemos el resto de la página por eso.
-    fundacionesDonacion = []; fundacionesSubasta = [];
+  estadoFundaciones = "pidiendo";
+  try { pintarFundaciones(); } catch(err){}
+
+  // El servidor gratuito se duerme tras un rato sin uso, y el primer pedido
+  // puede tardar casi un minuto o fallar mientras despierta. Por eso se
+  // reintenta en vez de dar la lista por vacía: si no, el primero que entra
+  // después de una pausa ve una web sin ninguna fundación, y no vuelve.
+  for (var intento = 1; intento <= 3; intento++) {
+    try {
+      var r = await Promise.all([
+        SyD.fundaciones.listar("donacion"),
+        SyD.fundaciones.listar("subasta")
+      ]);
+      fundacionesDonacion = r[0].map(normalizarFundacion);
+      fundacionesSubasta = r[1].map(normalizarFundacion);
+      estadoFundaciones = "listo";
+      try { pintarFundaciones(); } catch(err){}
+      return;
+    } catch(err) {
+      if (intento < 3) {
+        await new Promise(function(sigue){ setTimeout(sigue, intento * 4000); });
+      }
+    }
   }
+  fundacionesDonacion = []; fundacionesSubasta = [];
+  estadoFundaciones = "fallo";
+  try { pintarFundaciones(); } catch(err){}
 }
 
 function fundacionPorId(id){
@@ -7438,7 +7456,13 @@ function pintarFundaciones(){
   caja.className = "fx-lista" + (fxEstado.vista === "una" ? " es-una" : "");
   caja.innerHTML = lista.length
     ? lista.map(tarjetaFundacion).join("")
-    : '<div class="empty">No encontramos fundaciones con esa búsqueda.</div>';
+    : (estadoFundaciones === "pidiendo"
+        ? '<div class="empty">Buscando fundaciones…</div>'
+        : estadoFundaciones === "fallo"
+          ? '<div class="empty">No pudimos conectarnos. Revisá tu conexión y volvé a entrar.</div>'
+          : (fxEstado.q || "").trim()
+            ? '<div class="empty">No encontramos fundaciones con esa búsqueda.</div>'
+            : '<div class="empty">Todavía no hay fundaciones publicadas.</div>');
   $$("[data-ffiltro]").forEach(function(b){
     b.classList.toggle("is-on", (b.dataset.ffiltro === "favoritas") === fxEstado.solofav);
   });
@@ -9892,6 +9916,10 @@ function abrirFundaciones(){
     sel.dataset.listo = "1";
     sel.addEventListener("change", function(){ fxEstado.lugar = sel.value; pintarFundaciones(); });
   }
+  // Se vuelven a pedir al entrar: si la primera carga falló (el servidor
+  // gratuito tarda en despertar) o el admin dio de alta una fundación
+  // mientras tanto, esta pantalla la tiene que ver sin recargar la página.
+  cargarFundacionesReales();
   abrirPantalla("screen-fundaciones", function(){
     // Se mide como las demás para que la tarjeta no quede bajo el menú.
     requestAnimationFrame(acomodarCarruseles);
@@ -13882,7 +13910,7 @@ async function cargarEventosAdmin(caja){
         }).join(""));
 }
 
-async // Borrar una fundación es para el caso de "la cargué mal recién". Si ya tiene
+// Borrar una fundación es para el caso de "la cargué mal recién". Si ya tiene
 // sueños, subastas o eventos, el backend lo rechaza y explica por qué: ahí
 // corresponde suspenderla, que la saca de la web sin perder el historial.
 function borrarFundacion(id){
