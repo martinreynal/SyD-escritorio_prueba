@@ -11944,7 +11944,9 @@ function exportarPDF(){
   var w = window.open("", "_blank");
   if(!w){ toast("Permití las ventanas emergentes para generar el PDF."); return; }
   w.document.write(
-    '<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><title>Reporte '+d.f.nombre+'</title>'+
+    // esc() también acá: el nombre lo carga el admin, pero escribirlo sin
+    // escapar en el documento del reporte es una puerta abierta igual.
+    '<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><title>Reporte '+esc(d.f.nombre)+'</title>'+
     '<style>body{font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;color:#10242C;margin:40px;}'+
     'h1{font-weight:200;letter-spacing:-.03em;font-size:30px;margin:0}'+
     'p.sub{color:#6E8592;font-size:13px;margin:6px 0 26px}'+
@@ -11957,7 +11959,7 @@ function exportarPDF(){
     '.m2{font-size:11px;font-weight:700;letter-spacing:.26em;text-transform:uppercase}'+
     '</style></head><body>'+
     '<div class="marca"><span class="m1"><i></i></span><span class="m2">Soñá y Doná</span></div>'+
-    '<h1>'+d.f.nombre+'</h1><p class="sub">Reporte generado el '+
+    '<h1>'+esc(d.f.nombre)+'</h1><p class="sub">Reporte generado el '+
     new Date().toLocaleDateString("es-AR")+'</p><table>'+filas+'</table></body></html>'
   );
   w.document.close();
