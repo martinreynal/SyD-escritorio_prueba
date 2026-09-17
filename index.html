@@ -14487,7 +14487,7 @@ function publicarSueno(id){
         toast("La fecha de caducidad tiene que ser posterior a la de inicio."); return;
       }
       try {
-        await SyD.suenos.publicar(id, {
+        await SyD.suenos.publicarASubasta(id, {
           fechaInicio: fechaAlMediodia(desde),
           fechaFin: fechaAlMediodia(hasta),
           precioInicial: base,

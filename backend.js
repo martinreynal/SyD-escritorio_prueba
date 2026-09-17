@@ -173,7 +173,12 @@
     },
     // Paso 2: verificado el comprobante, sale a subasta. Acá sí van las
     // fechas y el precio base.
-    publicar: function (id, datos) {
+    //
+    // OJO con el nombre: no puede llamarse "publicar" a secas. Arriba ya hay
+    // un publicar() —el que usa la persona para publicar su sueño— y el
+    // segundo pisaba al primero sin avisar: publicar un sueño terminaba
+    // llamando a la ruta de administración y respondía "no tenés permisos".
+    publicarASubasta: function (id, datos) {
       return post("/suenos/admin/" + id + "/publicar", datos);
     },
     rechazar: function (id, motivo) {
