@@ -7897,7 +7897,7 @@ function tarjetaPorSubastar(x){
         : '')+
       '<p class="lote__aviso">'+
         (x.desdeISO
-          ? 'La subasta abre el '+fechaCorta(x.desdeISO)+'.'
+          ? 'La subasta abre el '+fechaHoraCorta(x.desdeISO)+'.'
           : 'La subasta abre cuando la plataforma la habilite.')+'</p>'+
     '</div>'+
   '</article>';
@@ -10068,6 +10068,34 @@ function fechaAlMediodia(valor){
   return valor && valor.length <= 10 ? valor + "T12:00" : valor;
 }
 
+// El campo de día y hora del navegador usa el formato "2026-09-24T18:30",
+// siempre en la hora de acá. Estas dos funciones traducen entre ese formato y
+// el resto del sistema.
+function paraCampoFechaHora(d){
+  var p = function(n){ return String(n).padStart(2,"0"); };
+  return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate())+
+         "T"+p(d.getHours())+":"+p(d.getMinutes());
+}
+
+// Lo que se manda al servidor: el momento exacto, sin ambigüedad de zona
+// horaria. new Date() entiende ese formato como hora local, que es la que
+// eligió el administrador.
+function momentoISO(valor){
+  if(!valor) return valor;
+  var d = new Date(valor);
+  return isNaN(d) ? valor : d.toISOString();
+}
+
+// "24/9/26 18:30" — para cuando la hora cambia lo que la persona decide.
+function fechaHoraCorta(f){
+  if(!f) return "";
+  var d = new Date(String(f).length <= 10 ? f + "T12:00" : f);
+  if(isNaN(d)) return String(f);
+  var p = function(n){ return String(n).padStart(2,"0"); };
+  return d.getDate()+"/"+(d.getMonth()+1)+"/"+String(d.getFullYear()).slice(2)+
+         " "+p(d.getHours())+":"+p(d.getMinutes());
+}
+
 function fechaCorta(f){
   if(!f) return "";
   var d = new Date(String(f).length <= 10 ? f + "T12:00" : f);
@@ -10805,9 +10833,31 @@ var cortarEscuchaOfertas = null;
 function escucharOfertasEnVivo(){
   if(cortarEscuchaOfertas) return;           // ya estaba escuchando
   try {
-    cortarEscuchaOfertas = SyD.subastas.escucharOfertas(null, function(){
-      // Llega solo el aviso de que hubo una oferta nueva; se vuelve a pedir
-      // el listado para tener también quién va ganando y cuántas ofertas van.
+    cortarEscuchaOfertas = SyD.subastas.escucharOfertas(null, function(oferta){
+      // MEDIDO EL 17/09/2026 contra el servidor de producción: el aviso de
+      // que hubo una oferta llega en 1,3 segundos, pero hoy llega VACÍO (sin
+      // el monto ni a qué subasta corresponde). Es por permisos: la tabla de
+      // ofertas la creó Prisma y la clave pública del sitio no tiene permiso
+      // de lectura sobre ella, así que Supabase manda el aviso sin los datos.
+      // Por eso el atajo de acá abajo no se usa todavía y siempre se termina
+      // pidiendo la lista al servidor, que es lo que tarda (~3 s).
+      //
+      // Si algún día se le da permiso de lectura a esa tabla, el aviso llega
+      // con el monto, este atajo se activa solo y la tarjeta pasa a cambiar
+      // en ~1,3 s sin pedirle nada al servidor.
+      if(oferta && oferta.subastaId){
+        subastasReales.forEach(function(it){
+          if(it.id !== oferta.subastaId) return;
+          var monto = Number(oferta.monto);
+          var mejorActual = mejorOferta(it);
+          if(mejorActual && mejorActual.monto >= monto) return;   // llegó tarde
+          it.ofertas = [{ monto: monto, quien: "Alguien", anonimo: false }];
+          it.cuantas = (it.cuantas || 0) + 1;
+        });
+        try { pintarListaDeseos(); } catch(err){}
+      }
+      // Y en segundo plano se pide la lista completa, que trae el nombre de
+      // quien va ganando y corrige cualquier diferencia.
       cargarSubastasReales();
     });
   } catch(err) {
@@ -10966,7 +11016,11 @@ function tarjetaSueno(x){
   var mejor = mejorOferta(x);
   var actual = mejor ? mejor.monto : (x.valor || 0);
   var minimo = mejor ? mejor.monto + 1000 : (x.valor || 1000);
-  var cuantas = (x.ofertas||[]).length;
+  // De las subastas reales se guarda sólo la oferta más alta (no la lista
+  // entera), así que la cantidad viene aparte en `cuantas`. Las tarjetas de
+  // ejemplo de la maqueta sí traen la lista completa y no tienen `cuantas`:
+  // para ésas se sigue contando la lista.
+  var cuantas = typeof x.cuantas === "number" ? x.cuantas : (x.ofertas||[]).length;
   var propio = sesion && x.quien === sesion.nombre;
 
   // Quién va ganando, dicho sin confundirlo con quien pidió el sueño.
@@ -14577,7 +14631,7 @@ async function cargarSuenosAdmin(caja){
         (sub
           ? '<p class="adm-sueno__m">'+pesos(Number(sub.precioInicial))+' de base'+
             (mejor ? ' · '+pesos(Number(mejor.monto))+' ofertado' : ' · sin ofertas todavía')+
-            ' · del '+fechaCorta(sub.fechaInicio)+' al '+fechaCorta(sub.fechaFin)+'</p>'
+            ' · del '+fechaHoraCorta(sub.fechaInicio)+' al '+fechaHoraCorta(sub.fechaFin)+'</p>'
           : '')+
       '</div>';
     });
@@ -14728,41 +14782,45 @@ async function aprobarSueno(id){
 // Paso 2: verificado el comprobante, el sueño sale a subasta. Las fechas van
 // acá y no al aceptar: entre una cosa y la otra pueden pasar días.
 function publicarSueno(id){
-  var hoy = new Date();
-  var enUnMes = new Date(hoy.getTime() + 30*24*60*60*1000);
-  function comoFecha(d){ return d.toISOString().slice(0,10); }
+  // La hora importa tanto como el día: la subasta cierra en un instante
+  // exacto y el reloj de la tarjeta cuenta hacia ese momento. Si sólo se
+  // eligiera el día, el sistema tendría que inventar una hora.
+  var enUnaHora = new Date(Date.now() + 60*60*1000);
+  var enUnMes = new Date(enUnaHora.getTime() + 30*24*60*60*1000);
 
   abrirModal({
     eyebrow:"Sueños", titulo:"Publicar y programar la subasta",
-    sub:"El pago ya está verificado. Al publicarlo, la subasta queda abierta entre estas dos fechas.",
+    sub:"El pago ya está verificado. Al publicarlo, la subasta queda abierta entre estos dos momentos.",
     body:
-      campo("apDesde","Fecha de inicio","date","")+
-      campo("apHasta","Fecha de caducidad","date","")+
+      campo("apDesde","Cuándo abre (día y hora)","datetime-local","")+
+      campo("apHasta","Cuándo cierra (día y hora)","datetime-local","")+
       campoPesos("apBase","Precio base de la subasta","")+
       campoPesos("apInc","Incremento mínimo entre ofertas (opcional)","")+
-      '<p class="field__hint">El precio base es desde cuánto arrancan las ofertas.</p>',
+      '<p class="field__hint">El precio base es desde cuánto arrancan las ofertas. '+
+      'La subasta cierra exactamente a la hora que pongas: a partir de ese minuto '+
+      'ya no se puede ofertar.</p>',
     ok:"Publicar el sueño",
     after:function(){
-      $("#apDesde").value = comoFecha(hoy);
-      $("#apHasta").value = comoFecha(enUnMes);
+      $("#apDesde").value = paraCampoFechaHora(enUnaHora);
+      $("#apHasta").value = paraCampoFechaHora(enUnMes);
     },
     onOk:async function(){
       var desde = $("#apDesde").value, hasta = $("#apHasta").value;
       var base = valPesos("apBase"), inc = valPesos("apInc");
-      if(!desde || !hasta){ toast("Poné las dos fechas."); return; }
+      if(!desde || !hasta){ toast("Poné cuándo abre y cuándo cierra."); return; }
       if(!(base > 0)){ toast("Poné el precio base de la subasta."); return; }
       if(new Date(hasta) <= new Date(desde)){
-        toast("La fecha de caducidad tiene que ser posterior a la de inicio."); return;
+        toast("El cierre tiene que ser posterior a la apertura."); return;
       }
       try {
         await SyD.suenos.publicarASubasta(id, {
-          fechaInicio: fechaAlMediodia(desde),
-          fechaFin: fechaAlMediodia(hasta),
+          fechaInicio: momentoISO(desde),
+          fechaFin: momentoISO(hasta),
           precioInicial: base,
           incrementoMinimo: inc > 0 ? inc : undefined,
         });
         cerrarModal();
-        toast("Publicado. La subasta queda abierta hasta el "+fechaCorta(hasta)+".");
+        toast("Publicado. La subasta cierra el "+fechaHoraCorta(hasta)+".");
         pintarAdmin();
       } catch(err) {
         toast(err.message);
