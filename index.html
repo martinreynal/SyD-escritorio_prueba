@@ -6950,6 +6950,7 @@ async function cargarFundacionesReales(){
       fundacionesDonacion = r[0].map(normalizarFundacion);
       fundacionesSubasta = r[1].map(normalizarFundacion);
       estadoFundaciones = "listo";
+      colgarEventosEnFundaciones();
       try { pintarFundaciones(); } catch(err){}
       return;
     } catch(err) {
@@ -7623,10 +7624,27 @@ async function cargarEventosReales(){
       miAsistencia: ev.miAsistencia || null
     }};
   });
+  colgarEventosEnFundaciones();
   try { pintarEventos(); } catch(err){}
 }
 
 function proximosEventos(){ return eventosReales.slice(); }
+
+// El perfil de una fundación lee sus eventos de f.eventos, que en las
+// fundaciones reales arranca vacío. Acá se les cuelgan los que de verdad
+// organiza cada una, para que la ficha no diga "sin eventos" teniéndolos.
+// Se llama después de cargar fundaciones Y después de cargar eventos,
+// porque cualquiera de las dos puede llegar última.
+function colgarEventosEnFundaciones(){
+  var todas = (fundacionesDonacion || []).concat(fundacionesSubasta || []);
+  todas.forEach(function(f){ f.eventos = []; });
+  (eventosReales || []).forEach(function(it){
+    todas.forEach(function(f){
+      if(f.id === it.f.id) f.eventos.push(it.e);
+    });
+  });
+  try { if(typeof fundacionAbierta !== "undefined" && fundacionAbierta) pintarFundacionAbierta(); } catch(err){}
+}
 
 // En qué punto de la doble confirmación quedó esta persona para este evento.
 function estadoAsistencia(e){
