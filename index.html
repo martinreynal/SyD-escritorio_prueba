@@ -8788,6 +8788,8 @@ function programarFugaz(){
 
 /* ==================== modal ==================== */
 var onOk = null;
+var alCancelar = null;
+
 function abrirModal(cfg){
   $("#modalEyebrow").textContent = cfg.eyebrow || "";
   $("#modalTitle").textContent = cfg.titulo || "";
@@ -8799,15 +8801,24 @@ function abrirModal(cfg){
   $("#modalOk").style.display = cfg.ok === false ? "none" : "";
   $(".modal__box").classList.toggle("modal__box--grande", cfg.ancho === "grande");
   $(".modal__box").classList.toggle("modal__box--pleno", cfg.clase === "modal--pleno");
-  $("#modalCancel").textContent = cfg.cancelar || "Cancelar";
+  // cancelar:false esconde el botón; si no, se puede cambiar su texto.
+  $("#modalCancel").style.display = cfg.cancelar === false ? "none" : "";
+  $("#modalCancel").textContent = (cfg.cancelar === false ? "" : cfg.cancelar) || "Cancelar";
+  // Qué hacer al cancelar, cuando cerrar y ya no alcanza (por ejemplo, si
+  // atrás no quedó ninguna pantalla en la que quedarse parado).
+  alCancelar = cfg.alCancelar || null;
   $("#modalSub").style.display = cfg.sub ? "" : "none";
   onOk = cfg.onOk || null;
   $("#modal").classList.add("is-open");
   if(cfg.after) cfg.after();
   // No abrimos el teclado solo: molesta más de lo que ayuda en celular.
 }
-function cerrarModal(){ $("#modal").classList.remove("is-open"); onOk = null; }
-$("#modalCancel").addEventListener("click", cerrarModal);
+function cerrarModal(){ $("#modal").classList.remove("is-open"); onOk = null; alCancelar = null; }
+$("#modalCancel").addEventListener("click", function(){
+  var hacer = alCancelar;
+  cerrarModal();
+  if(hacer) hacer();
+});
 $("#modal").addEventListener("click", function(e){ if(e.target===this) cerrarModal(); });
 document.addEventListener("keydown", function(e){ if(e.key==="Escape") cerrarModal(); });
 /**
@@ -9756,47 +9767,36 @@ document.addEventListener("change", function(e){
   });
 });
 
+// Editar el perfil, contra el servidor. Antes esto solo cambiaba el nombre
+// en la memoria del navegador y le renombraba los registros de la maqueta:
+// al recargar la página volvía todo atrás.
 function modalEditarPerfil(){
   if(!sesion || esFundacion()) return;
   abrirModal({eyebrow:"Editar", titulo:"Mi perfil",
-    sub:"Para cambiar tu foto, tocá la foto en tu perfil.",
-    body: campo("upNombre","Nombre y apellido","text","")+
-          campo("upMail","Mail","email","")+
-          '<label class="check"><input type="checkbox" id="upAnon"> Figurar como Donante Anónimo</label>'+
-          '<div class="acciones" style="margin-top:18px">'+
-          '<button class="btn btn--ghost btn--block" id="upSalir">Cerrar sesión</button></div>',
+    sub:"Tus datos. El mail no se cambia desde acá.",
+    ancho:"grande",
+    body: camposDePerfil()+
+      '<p class="field__hint" style="margin-top:14px">Mail de tu cuenta: <b>'+esc(sesion.mail)+'</b></p>'+
+      '<div class="acciones" style="margin-top:18px">'+
+      '<button class="btn btn--ghost btn--block" id="upSalir">Cerrar sesión</button></div>',
     ok:"Guardar cambios",
-    after:function(){
-      $("#upNombre").value = sesion.nombre; $("#upMail").value = sesion.mail;
-      $("#upAnon").checked = !!DB.perfilesAnonimos[sesion.nombre];
+    after:async function(){
+      try {
+        cargarCamposDePerfil(await SyD.usuarios.obtenerPerfil());
+      } catch(err) {
+        toast("No pudimos traer tus datos: "+err.message);
+      }
     },
     onOk:function(){
-      var n = val("upNombre");
-      if(!n){ toast("El nombre no puede quedar vacío."); return; }
-      var anterior = sesion.nombre;
-      if(n !== anterior){
-        DB.donaciones.forEach(function(d){
-          if(d.quien === anterior){ d.quien = n; if(!d.anonimo) d.quienPublico = n; }
-        });
-        DB.solicitudes.forEach(function(x){ if(x.quien === anterior) x.quien = n; });
-        DB.aportes.forEach(function(x){
-          if(x.quien === anterior) x.quien = n;
-          if(x.pujador === anterior) x.pujador = n;
-        });
-        DB.fundaciones.forEach(function(f){
-          f.eventos.forEach(function(e){
-            var i = (e.asistentes||[]).indexOf(anterior);
-            if(i > -1) e.asistentes[i] = n;
-          });
-        });
-      }
-      var quiereAnon = $("#upAnon").checked;
-      delete DB.perfilesAnonimos[anterior];
-      if(quiereAnon) DB.perfilesAnonimos[n] = true;
-      sesion.anonimo = quiereAnon;
-      sesion.nombre = n; sesion.ini = iniciales(n);
-      sesion.mail = val("upMail") || sesion.mail;
-      cerrarModal(); pintarTodo(); toast("Perfil actualizado.");
+      var datos = leerCamposDePerfil();
+      if(!datos) return;
+      return SyD.usuarios.guardarPerfil(datos).then(function(perfil){
+        sesion.nombre = (perfil.nombre+" "+perfil.apellido).trim();
+        sesion.ini = iniciales(sesion.nombre);
+        cerrarModal();
+        pintarTodo();
+        toast("Datos actualizados.");
+      }).catch(function(err){ toast(err.message); });
     }});
 }
 
@@ -13254,6 +13254,9 @@ $("#altaCampos").addEventListener("click", function(e){
 // también al cargar la página si ya había una sesión guardada. Busca el
 // perfil de negocio (nombre, apellido, si es admin) y arma la pantalla
 // correspondiente.
+// Lo que ya tenía cargado, para no hacerle escribir de nuevo lo que sí está.
+var perfilIncompleto = null;
+
 async function entrarConSesionReal(){
   var perfil;
   try {
@@ -13263,12 +13266,18 @@ async function entrarConSesionReal(){
     abrirLogin();
     return;
   }
-  if(!perfil){
-    // Primera vez (típico de Google): todavía no completó nombre/apellido.
+  if(perfil && perfil.esAdmin){ entrarComoAdmin(); return; }
+
+  // El pedido del cliente enumera los datos que hay que recopilar: mail,
+  // teléfono, nombre y apellido, edad y género. Si falta alguno —porque la
+  // cuenta es nueva, o porque viene de antes de que se pidieran todos— se
+  // completan antes de seguir. Se pide una sola vez.
+  if(!perfil || !perfil.nombre || !perfil.apellido || !perfil.telefono ||
+     !perfil.edad || !perfil.genero){
+    perfilIncompleto = perfil;
     pedirDatosDePerfil();
     return;
   }
-  if(perfil.esAdmin){ entrarComoAdmin(); return; }
   var nombreCompleto = (perfil.nombre+" "+perfil.apellido).trim();
   sesion = {tipo:"usuario", mail:perfil.email, nombre:nombreCompleto,
     ini:iniciales(nombreCompleto), color:"#87CEEB", foto:null,
@@ -13279,17 +13288,75 @@ async function entrarConSesionReal(){
 // Modal chico para completar nombre/apellido la primera vez que alguien
 // entra con Google (Google solo nos da el mail, no separa nombre/apellido
 // de la forma en que lo pide el cliente).
+// ── Datos de la persona ─────────────────────────────────────────────────
+// El pedido del cliente los enumera uno por uno: mail, teléfono, nombre y
+// apellido, edad y género. El mail sale de la cuenta; los otros cuatro se
+// piden acá. Un solo armador para los dos lugares donde se usan —al
+// completar el perfil y al editarlo— así no se desincronizan.
+var GENERO_TEXTO = {
+  FEMENINO: "Femenino", MASCULINO: "Masculino",
+  OTRO: "Otro", PREFIERO_NO_DECIR: "Prefiere no decirlo"
+};
+
+var GENEROS = [
+  ["", "Prefiero no decirlo"],
+  ["FEMENINO", "Femenino"],
+  ["MASCULINO", "Masculino"],
+  ["OTRO", "Otro"]
+];
+
+function camposDePerfil(){
+  return campo("pfNombre","Nombre","text","")+
+    campo("pfApellido","Apellido","text","")+
+    campo("pfTelefono","Teléfono","tel","11 5555 5555",
+      '<p class="field__hint">Para poder contactarte si tu sueño avanza.</p>')+
+    campo("pfEdad","Edad","number","")+
+    '<div class="field"><label for="pfGenero">Género</label><select id="pfGenero">'+
+      GENEROS.map(function(g){ return '<option value="'+g[0]+'">'+g[1]+'</option>'; }).join("")+
+    '</select></div>';
+}
+
+function cargarCamposDePerfil(perfil){
+  perfil = perfil || {};
+  $("#pfNombre").value = perfil.nombre || "";
+  $("#pfApellido").value = perfil.apellido || "";
+  $("#pfTelefono").value = perfil.telefono || "";
+  $("#pfEdad").value = perfil.edad || "";
+  $("#pfGenero").value = perfil.genero || "";
+}
+
+// Devuelve los datos listos para mandar, o null si falta algo (y avisa qué).
+function leerCamposDePerfil(){
+  var nombre = val("pfNombre"), apellido = val("pfApellido"), telefono = val("pfTelefono");
+  var edad = Number(val("pfEdad")) || 0, genero = $("#pfGenero").value;
+  if(!nombre || !apellido){ toast("Completá tu nombre y apellido."); return null; }
+  if(!telefono){ toast("Dejanos un teléfono para poder contactarte."); return null; }
+  if(!edad){ toast("Completá tu edad."); return null; }
+  if(edad < 13 || edad > 120){ toast("Revisá la edad: tiene que estar entre 13 y 120."); return null; }
+  return {
+    nombre: nombre, apellido: apellido, telefono: telefono, edad: edad,
+    genero: genero || "PREFIERO_NO_DECIR"
+  };
+}
+
 function pedirDatosDePerfil(){
   abrirModal({eyebrow:"Un paso más", titulo:"Completá tu perfil",
-    sub:"Necesitamos tu nombre y apellido para tu cuenta.",
-    body: campo("pfNombre","Nombre","text","")+campo("pfApellido","Apellido","text",""),
+    sub:"Lo pedimos una sola vez. Podés cambiarlo después desde Mi perfil.",
+    ancho:"grande",
+    body: camposDePerfil(),
     ok:"Guardar",
+    cancelar:"Ahora no",
+    // Cancelar no puede dejar a la persona en una pantalla en blanco: queda
+    // mirando la web como cualquiera sin cuenta, y se le vuelve a pedir
+    // cuando quiera hacer algo que necesite tenerla.
+    alCancelar:function(){ mostrarApp(); },
+    after:function(){ cargarCamposDePerfil(perfilIncompleto); },
     onOk:function(){
-      var nombre = val("pfNombre"), apellido = val("pfApellido");
-      if(!nombre || !apellido){ toast("Completá nombre y apellido."); return; }
-      SyD.usuarios.guardarPerfil({nombre:nombre, apellido:apellido}).then(function(){
+      var datos = leerCamposDePerfil();
+      if(!datos) return;
+      return SyD.usuarios.guardarPerfil(datos).then(function(){
         cerrarModal();
-        entrarConSesionReal();
+        return entrarConSesionReal();
       }).catch(function(err){ toast(err.message); });
     }});
 }
@@ -13985,7 +14052,12 @@ async function cargarUsuariosAdmin(caja){
           return '<div class="adm-fund">'+
             '<span class="adm-fund__av">'+esc(iniciales(nombreCompleto))+'</span>'+
             '<span class="adm-fund__t"><b>'+esc(nombreCompleto)+'</b>'+
-              '<span>'+esc(u.email)+(u.telefono ? ' · '+esc(u.telefono) : '')+'</span>'+
+              '<span>'+esc(u.email)+(u.telefono ? ' · '+esc(u.telefono) : ' · sin teléfono')+'</span>'+
+              // El pedido del cliente enumera edad y género entre los datos a
+              // recopilar: si están, se muestran; si no, se dice que faltan.
+              '<span>'+
+                (u.edad ? u.edad+" años" : "edad no cargada")+' · '+
+                esc(GENERO_TEXTO[u.genero] || "género no cargado")+'</span>'+
               '<span>'+u._count.suenos+(u._count.suenos===1?' sueño':' sueños')+
                 ' · '+u._count.ofertas+(u._count.ofertas===1?' oferta':' ofertas')+
                 ' · '+u._count.donaciones+(u._count.donaciones===1?' donación':' donaciones')+'</span>'+
