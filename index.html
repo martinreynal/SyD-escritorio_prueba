@@ -1565,6 +1565,12 @@ body.es-admin #screen-admin.is-active{display:block;height:auto}
 .adm-sueno__acc{display:flex;gap:8px;margin-top:11px}
 .adm-sueno__acc .btn{flex:1}
 
+/* Los pasos que siguen después de publicar un sueño. */
+.pasos-sueno{margin:4px 0 0;padding-left:20px;display:flex;flex-direction:column;gap:14px}
+.pasos-sueno li{color:var(--tinta)}
+.pasos-sueno li b{display:block;font-size:14.5px;margin-bottom:3px}
+.pasos-sueno li span{display:block;font-size:13px;color:var(--gris);line-height:1.5}
+
 .adm-estado{flex:none;font-size:11px;font-weight:700;padding:3px 9px;border-radius:99px;
   background:rgba(255,255,255,.1);color:rgba(255,255,255,.8);white-space:nowrap}
 .adm-estado.es-pendiente{background:rgba(246,196,83,.2);color:#f6c453}
@@ -12256,6 +12262,11 @@ function abrirPantallaAporte(modo, fidPre){
 //
 // Se guarda en el navegador y no en memoria porque el login con Google sale
 // de la página y vuelve: una variable no sobrevive a eso.
+// El fee de subasta, para los textos que lo nombran. El monto que vale es
+// siempre el que manda el servidor (viene en cobroDelFee); este es solo para
+// explicarlo antes de que exista el sueño.
+var FEE_SUBASTA = 20000;
+
 var CLAVE_BORRADOR = "syd_borrador_sueno";
 
 function guardarBorradorSueno(){
@@ -12579,9 +12590,35 @@ async function publicarSuenoReal(datos, valor, linkFundacion, nombreFundacion){
   if(valor > 0 && linkFundacion) abrirFormaDeCobro(linkFundacion, nombreFundacion);
 
   cerrarAporte(); pintarTodo();
-  toast(valor > 0
-    ? "Tu sueño quedó enviado a revisión. Completá tu donación en la pestaña que se abrió."
-    : "Tu sueño quedó enviado a revisión. Te avisamos por mail cuando lo aprueben.");
+
+  // Un cartel que desaparece en tres segundos no alcanza para explicar un
+  // recorrido de tres pasos. Publicar un sueño no termina al publicarlo:
+  // hay que esperar la revisión y después pagar el fee, y si eso no queda
+  // dicho la persona se queda esperando algo que nunca va a pasar sola.
+  abrirModal({
+    eyebrow:"Listo", titulo:"Tu sueño quedó enviado",
+    sub:"Todavía no está publicado. Estos son los pasos que siguen.",
+    ancho:"grande",
+    body:
+      '<ol class="pasos-sueno">'+
+        '<li><b>Lo revisamos</b><span>Miramos que esté todo bien y te avisamos por mail. '+
+          'Nadie lo ve todavía.</span></li>'+
+        '<li><b>Si lo aceptamos, pagás el fee de subasta</b><span>Transferís '+
+          pesos(FEE_SUBASTA)+' directo a la fundación que elegiste y subís el comprobante. '+
+          'Soñá y Doná no recibe esa plata.</span></li>'+
+        '<li><b>Sale a subasta</b><span>Verificamos el comprobante y tu sueño se publica, '+
+          'con fecha de apertura y de cierre.</span></li>'+
+      '</ol>'+
+      '<p class="field__hint" style="margin-top:16px">Podés seguir en qué quedó desde '+
+        '<b>Mi perfil → Mis sueños</b>, cuando quieras.</p>'+
+      (valor > 0
+        ? '<p class="field__hint" style="margin-top:10px">Tu donación quedó abierta en otra '+
+          'pestaña para que la completes.</p>'
+        : ''),
+    ok:"Ver mis sueños",
+    cancelar:"Cerrar",
+    onOk:function(){ cerrarModal(); modalMisSuenos(); }
+  });
 }
 
 function avanzarAporte(){
