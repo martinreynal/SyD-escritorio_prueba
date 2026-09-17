@@ -252,6 +252,11 @@
     suspender: function (id) {
       return del("/fundaciones/" + id);
     },
+    // Borrado definitivo. El backend lo rechaza si la fundación ya tiene
+    // sueños, subastas o eventos: en ese caso hay que suspenderla.
+    borrar: function (id) {
+      return del("/fundaciones/" + id + "/definitivo");
+    },
   };
 
   // ── Eventos ──────────────────────────────────────────────────────────

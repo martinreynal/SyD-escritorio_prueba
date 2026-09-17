@@ -13486,6 +13486,7 @@ document.addEventListener("click", function(e){
   if(e.target.closest("#adminSalir")) return salirDeAdmin();
   if(e.target.closest("#btnAgregarFundacion")) return modalFundacionAdmin(null);
   if(e.target.closest("#btnAgregarEvento")) return modalEventoAdmin();
+  if((t = e.target.closest("[data-borrar-fundacion]"))) return borrarFundacion(t.dataset.borrarFundacion);
   if((t = e.target.closest("[data-editar-fundacion]"))){
     var fEdit = fundacionesAdminCache.filter(function(x){ return x.id === t.dataset.editarFundacion; })[0];
     if(fEdit) modalFundacionAdmin(fEdit);
@@ -13838,6 +13839,7 @@ async function cargarFundacionesAdmin(caja){
             '<button class="btn btn--ghost btn--sm" data-editar-fundacion="'+f.id+'">Editar</button>'+
             '<button class="btn btn--ghost btn--sm" data-suspender-real="'+f.id+'" data-estado="'+(suspendida?"suspendida":"activa")+'">'+
               (suspendida ? "Reactivar" : "Suspender")+'</button>'+
+            '<button class="btn btn--ghost btn--sm" data-borrar-fundacion="'+f.id+'">Borrar</button>'+
           '</div>';
         }).join(""));
 }
@@ -13880,7 +13882,41 @@ async function cargarEventosAdmin(caja){
         }).join(""));
 }
 
-function modalEventoAdmin(){
+async // Borrar una fundación es para el caso de "la cargué mal recién". Si ya tiene
+// sueños, subastas o eventos, el backend lo rechaza y explica por qué: ahí
+// corresponde suspenderla, que la saca de la web sin perder el historial.
+function borrarFundacion(id){
+  var f = fundacionesAdminCache.filter(function(x){ return x.id === id; })[0];
+  abrirModal({
+    eyebrow:"Borrar fundación",
+    titulo:"¿Borrar " + ((f && f.nombre) || "esta fundación") + "?",
+    sub:"Esto no se puede deshacer.",
+    body:'<p class="field__hint">Se borra del sistema por completo. Si en cambio querés '+
+         'que deje de verse en la web pero conservar su historial, usá <b>Suspender</b>.</p>',
+    ok:"Sí, borrar",
+    cancelar:"No",
+    onOk:async function(){
+      try {
+        await SyD.fundaciones.borrar(id);
+      } catch(err) {
+        // El caso esperado: ya tiene datos asociados. El mensaje del backend
+        // explica qué tiene y qué hacer en su lugar.
+        toast(err.message);
+        return;
+      }
+      fundacionesListas = cargarFundacionesReales();
+      await fundacionesListas;
+      cerrarModal();
+      toast("Fundación borrada.");
+      pintarAdmin();
+    }
+  });
+}
+
+async function modalEventoAdmin(){
+  // Se vuelven a pedir antes de mirar: si el admin acaba de cargar una
+  // fundación, la copia local puede estar vieja y diría que no hay ninguna.
+  await cargarFundacionesReales();
   // Los eventos los organiza una fundación, de cualquiera de las dos ramas.
   var todas = fundacionesDonacion.concat(fundacionesSubasta.filter(function(f){
     return !fundacionesDonacion.some(function(d){ return d.id === f.id; });
@@ -14038,6 +14074,12 @@ function modalFundacionAdmin(f){
       try {
         if(esNueva) await SyD.fundaciones.crear(datos);
         else await SyD.fundaciones.editar(f.id, datos);
+        // Las listas por rama son una copia local: si no se vuelven a pedir,
+        // el resto del sistema (el alta de eventos, el selector al publicar un
+        // sueño, la pantalla pública) sigue sin ver la fundación recién creada
+        // hasta que alguien recargue la página.
+        fundacionesListas = cargarFundacionesReales();
+        await fundacionesListas;
         cerrarModal();
         toast(esNueva ? "Fundación creada." : "Fundación actualizada.");
         pintarAdmin();
