@@ -12197,9 +12197,21 @@ function prepararPasoSueno(){
       : '<p class="fund-res__vacio">'+
         (fundacionesSubasta.length
           ? "No encontramos esa fundación."
-          : "Todavía no hay fundaciones habilitadas para sueños.")+'</p>';
+          : estadoFundaciones === "pidiendo"
+            ? "Buscando fundaciones…"
+            : estadoFundaciones === "fallo"
+              ? "No pudimos conectarnos. Revisá tu conexión y volvé a entrar."
+              : "Todavía no hay fundaciones habilitadas para sueños.")+'</p>';
   }
   q.addEventListener("input", pintarFunds);
+
+  // Se vuelven a pedir al abrir el formulario y se redibuja la lista cuando
+  // llegan. Sin esto, quien abría esta pantalla antes de que respondiera el
+  // servidor veía "todavía no hay fundaciones" —que es falso— y recién
+  // aparecían al escribir algo, porque eso obligaba a redibujar.
+  cargarFundacionesReales().then(function(){
+    try { pintarFunds(); } catch(err){}
+  });
   res.addEventListener("click", function(e){
     var b = e.target.closest("[data-elige-fund]"); if(!b) return;
     oculto.value = oculto.value === b.dataset.eligeFund ? "" : b.dataset.eligeFund;
