@@ -24,13 +24,13 @@
       sel: "#screen-home",
       estado: "real",
       titulo: "Crear cuenta e iniciar sesión",
-      nota: "Con mail y contraseña o con Google. Las cuentas se guardan de verdad y los mails salen de verdad.",
+      nota: "Con mail y contraseña o con Google. Las cuentas se guardan de verdad y los mails salen de verdad. Al registrarse se piden los cinco datos que pedía el documento: nombre, apellido, mail, teléfono, edad y género; se pueden corregir después desde el perfil.",
     },
     {
       sel: "#screen-admin",
       estado: "real",
       titulo: "Panel de administración",
-      nota: "Sus cinco secciones trabajan contra la base de datos: Sueños, Solicitudes, CRM, Fundaciones y Eventos. Sueños muestra los tres momentos del recorrido: revisar el contenido, esperar el pago del fee y verificar el comprobante. Las pestañas Tablero y Finanzas de la maqueta se sacaron: mostraban cifras inventadas.",
+      nota: "Sus cinco secciones trabajan contra la base de datos: Sueños, Solicitudes, CRM, Fundaciones y Eventos. Sueños muestra los tres momentos del recorrido: revisar el contenido, esperar el pago del fee y verificar el comprobante. Al publicar un sueño a subasta se elige el día y la hora de apertura y de cierre, y desde qué monto arrancan las ofertas. Las pestañas Tablero y Finanzas de la maqueta se sacaron: mostraban cifras inventadas.",
     },
     {
       sel: "#screen-fundaciones",
@@ -60,13 +60,13 @@
       sel: "#screen-deseos",
       estado: "real",
       titulo: "Subastas activas",
-      nota: "Muestra las subastas que están corriendo, con el precio base real y quién va ganando. Ofertar queda registrado, y si alguien oferta mientras estás mirando la pantalla se actualiza sola. Dos ofertas al mismo tiempo nunca se pisan.",
+      nota: "Muestra las subastas que están corriendo, con el precio base real y quién va ganando. Ofertar queda registrado, y si alguien oferta mientras estás mirando, la pantalla se actualiza sola: probado contra el servidor de verdad, tarda unos 5 segundos y no se pierde ninguna oferta. Dos ofertas al mismo tiempo nunca se pisan. Cada subasta cierra a una hora exacta y el reloj cuenta hacia ese momento.",
     },
     {
       sel: "#screen-subastas",
       estado: "real",
       titulo: "Sueños por subastar",
-      nota: "Los sueños ya aprobados y pagados que tienen fecha de salida pero todavía no abrieron. Dice cuándo abre cada uno.",
+      nota: "Los sueños ya aprobados y pagados que tienen fecha de salida pero todavía no abrieron. Dice el día y la hora en que abre cada uno.",
     },
     {
       sel: "#screen-garantia",
