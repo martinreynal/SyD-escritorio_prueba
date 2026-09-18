@@ -7610,10 +7610,21 @@ var carEventos = crearCarrusel({
 var eventosReales = [];
 var estadoEventos = "sin-pedir";
 
+// "18:30" — la hora del evento en la hora de acá.
+function horaDeEvento(iso){
+  var d = new Date(iso);
+  if(isNaN(d)) return "";
+  var p = function(n){ return String(n).padStart(2,"0"); };
+  return p(d.getHours())+":"+p(d.getMinutes());
+}
+
 function fechaLargaEvento(iso){
   var d = new Date(iso);
   if(isNaN(d)) return "";
-  return d.getDate()+" de "+MESES_NOM[d.getMonth()];
+  var p = function(n){ return String(n).padStart(2,"0"); };
+  // La hora va junto al día: a un evento se va a una hora, no a un día.
+  return d.getDate()+" de "+MESES_NOM[d.getMonth()]+
+    ", "+p(d.getHours())+":"+p(d.getMinutes())+" h";
 }
 
 async function cargarEventosReales(){
@@ -7644,6 +7655,9 @@ async function cargarEventosReales(){
       imagen: ev.fotoUrl || null,
       fISO: ev.fecha,
       f: fechaLargaEvento(ev.fecha),
+      // La tarjeta ya tenía lugar para la hora al lado de la dirección; lo que
+      // faltaba era llenarlo con la hora real del evento.
+      hora: horaDeEvento(ev.fecha),
       requierePago: !!ev.requierePago,
       montoEntrada: ev.montoEntrada,
       // La tarjeta muestra este texto tal cual, y "Gratis" si viene vacío.
@@ -10079,14 +10093,6 @@ function abrirEventos(){
 // "2026-03-01" → "marzo". Si no hay fecha, decimos que es reciente.
 // Fecha corta y exacta, como 3/7/26. El historial la prefiere al mes suelto:
 // para reconocer una donación propia, el día importa.
-// Una fecha suelta ("2026-10-24") se interpreta como medianoche UTC, que en
-// Argentina es el día ANTERIOR a las 21hs: el evento cargado para el 24
-// aparecía como 23. Se manda al mediodía local, que cae en el mismo día en
-// cualquier huso razonable. Es el mismo truco que usa fechaCorta al leer.
-function fechaAlMediodia(valor){
-  return valor && valor.length <= 10 ? valor + "T12:00" : valor;
-}
-
 // El campo de día y hora del navegador usa el formato "2026-09-24T18:30",
 // siempre en la hora de acá. Estas dos funciones traducen entre ese formato y
 // el resto del sistema.
@@ -12629,8 +12635,8 @@ function pintarAporte(){
   }
 
   // --- propuesta de donación: paso 2, tu aporte voluntario a la fundación ---
-  // Publicar un sueño es gratis (no hay fee de la plataforma acá — el
-  // único fee real del sistema es el de subastar, y es aparte). Si además
+  // Acá no se cobra nada: el fee de subasta se paga después, y sólo si el
+  // sueño pasa la revisión (ver el aviso del paso 1). Si además
   // la persona quiere donar algo al publicar, no le pedimos tarjeta acá:
   // la mandamos directo al link de pago real de la fundación elegida.
   if(aporte.modo === "propuesta"){
@@ -12638,7 +12644,8 @@ function pintarAporte(){
     $("#screen-aporte").classList.add("sn-modo");
     $("#apEyebrow").textContent = "";
     $("#apTitulo").textContent = "Tu aporte";
-    $("#apLede").innerHTML = 'Publicar tu sueño es gratis. Si además querés donar, te llevamos directo a la fundación.';
+    $("#apLede").innerHTML = 'Enviar tu sueño no cuesta nada. Si además querés donar ahora, '+
+      'te llevamos directo a la fundación.';
     var f = fundacionPorId(aporte.fid);
     var linkFundacion = f && (f.linkPago || f.web);
     var total = aporte.valor || 0;
@@ -12666,7 +12673,12 @@ function pintarAporte(){
           '<div class="sn-card sn-card--pago">'+
             '<div class="sn-card__c">'+
               '<h3>'+esc(aporte.titulo || "Tu sueño")+'</h3>'+
-              '<div class="sn-card__fila"><span>Costo de publicación</span><div><b>Gratis</b></div></div>'+
+              '<div class="sn-card__fila"><span>Enviar tu sueño</span><div><b>Sin costo</b></div></div>'+
+              // El fee no se cobra acá y puede no cobrarse nunca (si el sueño se
+              // rechaza), pero callarlo en el resumen sería esconderlo justo donde
+              // la persona mira los números.
+              '<div class="sn-card__fila"><span>Si sale a subasta</span>'+
+                '<div><b>'+pesos(FEE_SUBASTA)+'</b><span class="sn-moneda">a la fundación</span></div></div>'+
               '<div class="sn-card__fila sn-card__fila--total"><span>Tu donación</span><div><b>'+pesos(total)+'</b><span class="sn-moneda">ARS</span></div></div>'+
               '<div class="sn-card__fila"><span>Fundación destino</span>'+
                 '<div class="sn-card__fund">'+(f
@@ -14318,7 +14330,7 @@ async function modalEventoAdmin(){
       campo("meTitulo","Nombre del evento","text","")+
       '<div class="field"><label for="meDesc">Descripción</label>'+
         '<textarea id="meDesc" class="caja-grande" placeholder="Qué es, para qué es, quién puede ir."></textarea></div>'+
-      campo("meFecha","Fecha","date","")+
+      campo("meFecha","Día y hora del evento","datetime-local","")+
       campo("meLugar","Lugar (opcional)","text","Dirección o sede")+
       campo("meFoto","URL de la foto (opcional)","text","https://…")+
       '<label class="check"><input type="checkbox" id="mePago"> El evento tiene un costo de entrada</label>'+
@@ -14341,7 +14353,7 @@ async function modalEventoAdmin(){
           fundacionId: $("#meFund").value,
           titulo: titulo,
           descripcion: desc,
-          fecha: fechaAlMediodia(fecha),
+          fecha: momentoISO(fecha),
           lugar: val("meLugar") || undefined,
           fotoUrl: val("meFoto") || undefined,
           requierePago: pago,
