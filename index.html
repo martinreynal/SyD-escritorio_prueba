@@ -8790,7 +8790,18 @@ function programarFugaz(){
 var onOk = null;
 var alCancelar = null;
 
+// Cada vez que se abre un modal se le pone un número. Sirve para saber si el
+// modal que está en pantalla sigue siendo el mismo que disparó una acción:
+// una acción puede terminar abriendo OTRO modal (confirmar asistencia abre el
+// de cómo pagar), y en ese caso el botón ya no le pertenece.
+var serieModal = 0;
+
 function abrirModal(cfg){
+  serieModal++;
+  // Un modal nuevo siempre llega con su botón habilitado, aunque el anterior
+  // lo haya dejado ocupado esperando al servidor.
+  $("#modalOk").disabled = false;
+  $("#modalOk").classList.remove("es-ocupado");
   $("#modalEyebrow").textContent = cfg.eyebrow || "";
   $("#modalTitle").textContent = cfg.titulo || "";
   $("#modalSub").textContent = cfg.sub || "";
@@ -8869,8 +8880,16 @@ $("#modalOk").addEventListener("click", function(){
   }
   if(!resultado || typeof resultado.then !== "function") return;
 
+  var serie = serieModal;
   var liberar = ocuparBoton(boton, "Procesando…");
-  resultado.then(function(){ liberar(); }, function(){ liberar(); });
+  // Si mientras tanto se abrió otro modal, su botón ya dice lo que tiene que
+  // decir: restaurarle el texto viejo lo dejaría con la etiqueta equivocada
+  // (era el caso de "Cómo completar el pago" mostrando "Sí, confirmo").
+  function terminar(){
+    if(serie === serieModal) liberar();
+    else { boton.disabled = false; boton.classList.remove("es-ocupado"); }
+  }
+  resultado.then(terminar, terminar);
 });
 
 // Campo de dinero: sin flechas, con "$" fijo adelante y separadores de miles.
