@@ -42,7 +42,7 @@
       sel: "#screen-eventos",
       estado: "real",
       titulo: "Actividades y eventos",
-      nota: "Los eventos se cargan desde el panel. Anotarse pide confirmar dos veces, como pidió el cliente, y los dos pasos quedan registrados por separado en la base. Si el evento tiene entrada, al confirmar muestra cómo pagarle a la fundación.",
+      nota: "Los eventos se cargan desde el panel con día y hora. Anotarse pide confirmar dos veces, como pidió el cliente, y los dos pasos quedan registrados por separado en la base —probado contra el sistema real, incluido que no se pueda saltear el primer paso. Si el evento tiene entrada, al confirmar muestra cómo pagarle a la fundación.",
     },
     {
       sel: "#screen-aporte",
