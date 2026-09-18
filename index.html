@@ -12425,6 +12425,11 @@ function abrirPantallaAporte(modo, fidPre){
 // El fee de subasta, para los textos que lo nombran. El monto que vale es
 // siempre el que manda el servidor (viene en cobroDelFee); este es solo para
 // explicarlo antes de que exista el sueño.
+// Lo que cuesta salir a subasta. Tiene que coincidir con FEE_MONTO_ARS del
+// servidor (se carga en Render → Environment): éste es sólo el número que se
+// le muestra a la persona antes de publicar, cuando todavía no hay ningún
+// sueño del cual pedirle el monto real al servidor. Una vez que el sueño
+// existe, el monto que se cobra sale siempre del servidor, no de acá.
 var FEE_SUBASTA = 20000;
 
 var CLAVE_BORRADOR = "syd_borrador_sueno";
@@ -12546,8 +12551,14 @@ function pintarAporte(){
             '<span class="sn-costo__i"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" '+
               'stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">'+
               '<path d="M12 20s-7-4.6-7-9.2A4 4 0 0 1 12 8a4 4 0 0 1 7 2.8C19 15.4 12 20 12 20z"/></svg></span>'+
-            '<span class="sn-costo__t"><b>Publicar tu sueño es gratis</b>'+
-              '<span>Si además querés donar, es opcional y va directo a la fundación que elijas.</span></span>'+
+            // Decirlo acá y no después: la persona tiene que saber que salir a
+            // subasta cuesta ANTES de escribir su sueño, no cuando ya se lo
+            // aceptaron. Hasta acá no se le cobra nada; el fee aparece recién
+            // si el sueño pasa la revisión, y va entero a la fundación.
+            '<span class="sn-costo__t"><b>Contarnos tu sueño no cuesta nada</b>'+
+              '<span>Si lo aceptamos y sale a subasta, ahí sí se paga un fee de '+
+              pesos(FEE_SUBASTA)+', que va <b>entero a la fundación que elijas</b>. '+
+              'Soñá y Doná no recibe esa plata. Te avisamos antes de que tengas que pagar nada.</span></span>'+
           '</div>'+
           '<div class="campo-neon field--fund">'+
             '<label for="ppFundQ">Elegí la fundación que querés apoyar</label>'+
@@ -14727,9 +14738,19 @@ async function modalPagarFee(id){
         'transferir <b>'+pesos(c.monto||0)+'</b>'+
         (x.fundacion ? ' a <b>'+esc(x.fundacion.nombre)+'</b>' : '')+
         '. La plata va directo a la fundación: Soñá y Doná no la recibe ni la retiene.</p>'+
+      // Igual que al donar: si la fundación cargó un link de pago, se abre;
+      // si cargó un alias o un CBU, se muestra para copiar. La persona no
+      // tiene que interpretar qué es lo que pegó la fundación.
       (c.datos
-        ? '<div class="field"><label>Dónde transferir</label>'+
-          '<p style="font-size:17px;font-weight:700;word-break:break-all">'+esc(c.datos)+'</p></div>'
+        ? (esLink(c.datos)
+            ? '<div class="field"><label>Dónde pagar</label>'+
+              '<p class="field__hint">La fundación cobra por su propia página. '+
+              'El botón te lleva ahí; volvé acá después para subir el comprobante.</p>'+
+              '<button type="button" class="btn btn--primary" id="pfIrACobrar" '+
+              'style="margin-top:10px">Ir a pagar a '+esc(x.fundacion ? x.fundacion.nombre : "la fundación")+'</button></div>'
+            : '<div class="field"><label>Dónde transferir</label>'+
+              '<p style="font-size:17px;font-weight:700;word-break:break-all">'+esc(c.datos)+'</p>'+
+              '<p class="field__hint">Copialo y transferí desde tu banco o billetera.</p></div>')
         : '<p class="field__hint">Esta fundación todavía no cargó dónde recibir el fee. '+
           'Escribinos y lo resolvemos.</p>')+
       '<div class="field"><label for="pfArchivo">Comprobante de la transferencia</label>'+
@@ -14738,6 +14759,10 @@ async function modalPagarFee(id){
       campo("pfRef","Número de operación (opcional)","text","Ej. TRF-884521"),
     ok: c.datos ? "Ya transferí" : false,
     after:function(){
+      var ir = $("#pfIrACobrar");
+      if(ir) ir.addEventListener("click", function(){
+        window.open(c.datos, "_blank", "noopener");
+      });
       var inp = $("#pfArchivo");
       if(inp) inp.addEventListener("change", function(){
         var f = inp.files && inp.files[0];
