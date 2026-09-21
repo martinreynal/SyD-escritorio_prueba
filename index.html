@@ -11036,11 +11036,25 @@ function mejorOferta(x){
   return of.length ? of[of.length-1] : null;
 }
 
+// Cuánto hay que poner, como mínimo, para ofertar en esta subasta. Misma
+// cuenta que hace el servidor: la mejor oferta más el incremento de esa
+// subasta, o el precio base si todavía nadie ofertó.
+function minimoParaOfertar(x){
+  var mejor = mejorOferta(x);
+  if(!mejor) return Number(x.valor) || 0;
+  return mejor.monto + (Number(x.incremento) || 0);
+}
+
 function tarjetaSueno(x){
   var f = x.fid ? fundacionPorId(x.fid) : null;
   var mejor = mejorOferta(x);
   var actual = mejor ? mejor.monto : (x.valor || 0);
-  var minimo = mejor ? mejor.monto + 1000 : (x.valor || 1000);
+  // El mínimo para ofertar lo define cada subasta con su incremento, no un
+  // número fijo: el servidor rechaza cualquier oferta por debajo. Acá estaba
+  // escrito "+ 1000" a mano, así que el botón invitaba a ofertar un monto que
+  // el servidor después rechazaba (una subasta con incremento de $50.000
+  // mostraba "SUBASTAR $201.000" cuando el mínimo real era $250.000).
+  var minimo = minimoParaOfertar(x);
   // De las subastas reales se guarda sólo la oferta más alta (no la lista
   // entera), así que la cantidad viene aparte en `cuantas`. Las tarjetas de
   // ejemplo de la maqueta sí traen la lista completa y no tienen `cuantas`:
@@ -11926,7 +11940,7 @@ function modalOfertarSueno(did){
   if(!puedeAportar()){ toast("Las fundaciones reciben los sueños, no ofertan."); return; }
 
   var mejor = mejorOferta(x);
-  var minimo = mejor ? mejor.monto + (x.incremento || 0) : (x.valor || 0);
+  var minimo = minimoParaOfertar(x);
 
   abrirModal({eyebrow:"Cumplir este sueño", titulo:x.titulo||"Sueño",
     sub:(x.valor ? "Salió en "+pesos(x.valor) : ""),
@@ -14851,20 +14865,39 @@ function publicarSueno(id){
       campo("apDesde","Cuándo abre (día y hora)","datetime-local","")+
       campo("apHasta","Cuándo cierra (día y hora)","datetime-local","")+
       campoPesos("apBase","Precio base de la subasta","")+
-      campoPesos("apInc","Incremento mínimo entre ofertas (opcional)","")+
+      campoPesos("apInc","Incremento mínimo entre ofertas","")+
       '<p class="field__hint">El precio base es desde cuánto arrancan las ofertas. '+
+      'El incremento es lo mínimo que hay que subir cada vez: sin él la gente '+
+      'oferta de a un peso y la subasta no avanza. Se sugiere entre el 5% y el '+
+      '10% del precio base.<br>'+
       'La subasta cierra exactamente a la hora que pongas: a partir de ese minuto '+
       'ya no se puede ofertar.</p>',
     ok:"Publicar el sueño",
     after:function(){
       $("#apDesde").value = paraCampoFechaHora(enUnaHora);
       $("#apHasta").value = paraCampoFechaHora(enUnMes);
+      // Al escribir el precio base se propone un incremento del 10%, redondeado.
+      // Es sólo una propuesta: se puede pisar. Evita que quede en cero por
+      // desconocer qué poner.
+      var base = $("#apBase"), inc = $("#apInc");
+      if(base && inc) base.addEventListener("input", function(){
+        if(inc.dataset.tocado) return;
+        var v = valPesos("apBase");
+        if(!(v > 0)) return;
+        var sug = Math.max(100, Math.round(v * 0.1 / 100) * 100);
+        inc.value = sug.toLocaleString("es-AR");
+      });
+      if(inc) inc.addEventListener("input", function(){ inc.dataset.tocado = "1"; });
     },
     onOk:async function(){
       var desde = $("#apDesde").value, hasta = $("#apHasta").value;
       var base = valPesos("apBase"), inc = valPesos("apInc");
       if(!desde || !hasta){ toast("Poné cuándo abre y cuándo cierra."); return; }
       if(!(base > 0)){ toast("Poné el precio base de la subasta."); return; }
+      if(!(inc > 0)){
+        toast("Poné el incremento mínimo entre ofertas, si no se puede ofertar de a un peso.");
+        return;
+      }
       if(new Date(hasta) <= new Date(desde)){
         toast("El cierre tiene que ser posterior a la apertura."); return;
       }
@@ -14873,7 +14906,7 @@ function publicarSueno(id){
           fechaInicio: momentoISO(desde),
           fechaFin: momentoISO(hasta),
           precioInicial: base,
-          incrementoMinimo: inc > 0 ? inc : undefined,
+          incrementoMinimo: inc,
         });
         cerrarModal();
         toast("Publicado. La subasta cierra el "+fechaHoraCorta(hasta)+".");
