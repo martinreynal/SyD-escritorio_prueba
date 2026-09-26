@@ -13395,9 +13395,14 @@ async function entrarConSesionReal(){
   mostrarApp();
 }
 
-// Modal chico para completar nombre/apellido la primera vez que alguien
-// entra con Google (Google solo nos da el mail, no separa nombre/apellido
-// de la forma en que lo pide el cliente).
+// Formulario para completar los datos que pide el documento del cliente:
+// nombre, apellido, teléfono, edad y género. Aparece una sola vez, cuando
+// falta alguno.
+//
+// Quien entra con Google llega con el nombre ya cargado, porque el servidor
+// lo toma del propio token al crear la cuenta. Igual se muestra editable: el
+// nombre que figura en Google no siempre es el que la persona quiere usar, y
+// además teléfono, edad y género Google no los da.
 // ── Datos de la persona ─────────────────────────────────────────────────
 // El pedido del cliente los enumera uno por uno: mail, teléfono, nombre y
 // apellido, edad y género. El mail sale de la cuenta; los otros cuatro se
