@@ -106,15 +106,37 @@
     async cerrarSesion() {
       await sb.auth.signOut();
     },
+    /**
+     * Manda el mail con el enlace para elegir una contraseña nueva.
+     *
+     * La dirección de vuelta se arma igual que en el ingreso con Google: sin
+     * el "#" que pudiera traer la URL actual, porque Supabase agrega el suyo
+     * al final y dos "#" seguidos rompen la lectura del enlace.
+     */
+    async recuperarClave(email) {
+      var r = await sb.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin + window.location.pathname,
+      });
+      if (r.error) throw new Error(traducirErrorAuth(r.error));
+    },
+    /** Guarda la contraseña nueva. Sólo funciona con la sesión que abre el
+     *  enlace del mail, o con alguien ya logueado. */
+    async cambiarClave(nueva) {
+      var r = await sb.auth.updateUser({ password: nueva });
+      if (r.error) throw new Error(traducirErrorAuth(r.error));
+    },
     async sesionActual() {
       var r = await sb.auth.getSession();
       return r.data.session;
     },
     // Se llama una sola vez al cargar la página: reacciona a que el usuario
     // ya tenga sesión guardada, o a que Google lo acabe de redirigir de vuelta.
+    // El nombre del evento importa: cuando la persona llega desde el enlace
+    // de "recuperar contraseña", Supabase avisa con PASSWORD_RECOVERY y hay
+    // que pedirle la clave nueva en vez de entrarla como si nada.
     onCambioDeSesion(callback) {
-      sb.auth.onAuthStateChange(function (_evento, session) {
-        callback(session);
+      sb.auth.onAuthStateChange(function (evento, session) {
+        callback(session, evento);
       });
     },
   };
@@ -125,6 +147,8 @@
     if (/invalid login credentials/i.test(msg)) return "Mail o contraseña incorrectos.";
     if (/password should be at least/i.test(msg)) return "La contraseña necesita al menos 6 caracteres.";
     if (/email not confirmed/i.test(msg)) return "Todavía no confirmaste tu mail.";
+    if (/same.*password|should be different/i.test(msg)) return "Esa es la contraseña que ya tenías. Elegí una distinta.";
+    if (/for security purposes|rate limit|too many/i.test(msg)) return "Esperá un minuto antes de volver a pedirlo.";
     return msg || "Ocurrió un error. Probá de nuevo.";
   }
 

@@ -69,6 +69,10 @@ img{display:block;max-width:100%}
 .alert{font-size:13px;color:#B3261E;background:rgba(179,38,30,.07);padding:9px 12px;border-radius:8px;
   margin-bottom:14px;display:none}
 .alert.is-on{display:block}
+/* Si quedó encendida de un error anterior pero sin texto, no debe ocupar
+   lugar: en el teléfono esos 59px eran parte de lo que empujaba el botón de
+   Google fuera de la pantalla. */
+.alert:empty{display:none !important}
 
 /* ================= APP ================= */
 .topbar{position:sticky;top:0;z-index:40;border-bottom:1px solid var(--linea)}
@@ -2244,12 +2248,22 @@ body.menu-fijo .menu-principal{
    falta, se desplaza. Centrada cuando entra, completa cuando no. */
 #screen-home{width:100%;max-width:100%}
 body.portada #screen-home{height:100vh;height:100dvh}
-.portada{position:relative;height:100vh;height:100dvh;width:100%;overflow:hidden;
+/* overflow-y:auto y no hidden: en teléfonos bajos el acceso no entraba entero
+   y, al estar recortado, el botón de Google quedaba inalcanzable. Ahora, si
+   algo no entra, se puede deslizar. */
+.portada{position:relative;height:100vh;height:100dvh;width:100%;overflow-y:auto;overflow-x:hidden;
   -webkit-overflow-scrolling:touch;scrollbar-width:none;text-align:center}
 .portada::-webkit-scrollbar{display:none}
 .portada__caja{position:relative;z-index:1;min-height:100%;width:100%;
-  display:flex;flex-direction:column;align-items:stretch;justify-content:center;
+  display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;
   padding:max(18px, env(safe-area-inset-top)) 16px max(18px, env(safe-area-inset-bottom))}
+/* Centrado vertical que no recorta: con justify-content:center, cuando el
+   contenido es más alto que la pantalla se desborda por ARRIBA y esa parte
+   queda inalcanzable aunque se pueda deslizar. Estos dos espaciadores con
+   margen automático centran cuando sobra lugar y se achican a cero cuando no.
+   Es la forma compatible con todos los navegadores. */
+.portada__caja::before,
+.portada__caja::after{content:"";flex:0 0 auto;margin-block:auto;width:0;height:0}
 .portada__caja > *{width:100%}
 /* El logo es una imagen: sin object-fit, el tope de alto lo deformaba. */
 .portada__logo{align-self:center;width:min(32vw,124px);height:auto;max-height:16vh;object-fit:contain;filter:drop-shadow(0 0 22px rgba(45,212,191,.35))}
@@ -2257,6 +2271,30 @@ body.portada #screen-home{height:100vh;height:100dvh}
 .portada__m1,.portada__m2{font-size:clamp(34px,6.6vh,58px)}
 .portada__linea{align-self:center;margin:clamp(8px,1.6vh,18px) 0 clamp(6px,1.2vh,14px)}
 .portada__acceso{padding:clamp(13px,2.2vh,20px) 16px}
+
+/* ---- Pantallas bajas: que el acceso entre entero ----
+   El cliente reportó que en el teléfono el botón "Continuar con Google"
+   quedaba cortado y no se podía deslizar. Medido en un teléfono de 812px de
+   alto: el contenido medía 1029px, o sea 217px de más, y el botón terminaba
+   141px por debajo del borde.
+   Acá se recupera ese espacio sacando lo que es decorativo —el texto de
+   presentación y parte del logo— y apretando los botones. El formulario en sí
+   no se toca: los campos siguen del mismo tamaño para que se puedan usar. */
+@media (max-height: 880px){
+  .portada__logo{width:min(22vw,84px);max-height:10vh}
+  .portada__marca{margin-top:6px}
+  /* La bajada explica de qué se trata la plataforma: útil al llegar, de más
+     cuando ya estás escribiendo tu contraseña. */
+  body.portada .portada__bajada{display:none}
+  .portada__linea{margin:8px auto}
+  .portada__acceso{padding:12px 14px}
+  .cta--corto{padding:13px 20px;margin-top:4px}
+  /* En una sola línea: partido en dos, el botón crece y vuelve a empujar el
+     resto fuera de la pantalla, que es justo lo que estamos evitando. */
+  .cta--corto .cta__txt{font-size:15.5px;white-space:nowrap}
+  .campo-neon{margin-bottom:9px}
+  .pl-o{margin:7px 0}
+}
 /* Firma del desarrollo, al pie de la portada. Definición única.
    Va fuera del flujo: la caja de la portada ya entra justa en pantallas
    bajas y, si la firma empujara, el recorte se comía el acceso. Cuando no
@@ -5127,6 +5165,12 @@ body:not(.es-fundacion) #screen-avisos .aviso__cta{margin-top:8px}
     <div class="portada__linea"><i></i></div>
 
     <div class="portada__zona portada__acceso" id="portadaAcceso">
+      <!-- Si alguien entró al login y se arrepiente, tiene que poder salir.
+           Antes no había salida: la pantalla tapaba todo y la única forma de
+           volver era recargar la página. -->
+      <button class="pl-volver" id="loginVolver">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M20 12H5"/><path d="M10.5 6.5 4.5 12l6 5.5"/></svg>Volver</button>
       <p class="pl-eyebrow solo-esc">Iniciar sesión</p>
       <h2 class="pl-h solo-esc">Bienvenido</h2>
       <p class="pl-sub solo-esc">Ingresá a tu cuenta para continuar.</p>
@@ -13520,7 +13564,15 @@ function mostrarApp(){
   // ese formulario con todo cargado en vez de quedar en la portada.
   if(sesion) retomarBorradorSueno();
 }
+// Dónde estaba la persona antes de que le pidiéramos la cuenta, para poder
+// devolverla ahí si se arrepiente.
+var pantallaAntesDelLogin = null;
+
 function abrirLogin(){
+  var activa = document.querySelector(".screen.is-active");
+  // Si ya estaba en el login (por ejemplo, viniendo de "crear cuenta") se
+  // conserva el origen anterior en vez de pisarlo con el login mismo.
+  if(activa && activa.id !== "screen-home") pantallaAntesDelLogin = activa.id;
   if(!document.body.classList.contains("es-crear")){
     document.body.classList.remove("es-crear");
     var pc = $("#portadaCrear"), pa = $("#portadaAcceso");
@@ -13540,6 +13592,19 @@ function abrirLogin(){
 // La firma va apoyada al fondo, fuera del flujo. El espacio que queda bajo el
 // bloque de acceso cambia con el alto del teléfono, así que se le fija acá:
 // se achica para entrar y sólo se retira si de verdad no hay lugar.
+// Vuelve a donde estaba antes de que le pidiéramos iniciar sesión. Si no
+// había nada atrás (entró directo al login), lo deja en la pantalla principal.
+function volverDesdeLogin(){
+  var destino = pantallaAntesDelLogin && document.getElementById(pantallaAntesDelLogin)
+    ? pantallaAntesDelLogin : "screen-app";
+  pantallaAntesDelLogin = null;
+  document.body.classList.remove("portada");
+  $$(".screen").forEach(function(sc){ sc.classList.remove("is-active"); });
+  document.getElementById(destino).classList.add("is-active");
+  try { revisarCielo(); } catch(err) {}
+  window.scrollTo({top:0});
+}
+
 function acomodarFirmaPortada(){
   var firma = document.getElementById("portadaFirma");
   var caja = document.querySelector(".portada__caja");
@@ -13630,17 +13695,60 @@ if($("#verClave")) $("#verClave").addEventListener("click", function(){
   b.setAttribute("aria-label", oculta ? "Ocultar contraseña" : "Mostrar contraseña");
 });
 
+// Recuperar la contraseña. Antes esto mostraba "te mandamos un enlace" sin
+// mandar nada: la persona esperaba un mail que no existía. Ahora lo pide de
+// verdad y, cuando vuelve desde ese mail, se le pide la clave nueva (ver
+// pedirClaveNueva, más abajo).
 if($("#btnOlvide")) $("#btnOlvide").addEventListener("click", function(){
   abrirModal({eyebrow:"Recuperar acceso", titulo:"¿Olvidaste tu contraseña?",
-    sub:"Te mandamos un enlace para crear una nueva.",
-    body: campo("recMail","Tu mail","email", $("#mail") ? $("#mail").value : ""),
+    sub:"Te mandamos un enlace a tu mail para que elijas una nueva.",
+    body: campo("recMail","Tu mail","email", $("#mail") ? $("#mail").value : "")+
+      '<p class="field__hint">Si no lo ves en unos minutos, revisá el correo no deseado.</p>',
     ok:"Enviar enlace",
-    onOk:function(){
+    onOk:async function(){
       var m = val("recMail");
+      if(!m || m.indexOf("@") < 0){ toast("Escribí tu mail."); return; }
+      try {
+        await SyD.auth.recuperarClave(m);
+      } catch(err) {
+        toast(err.message); return;
+      }
       cerrarModal();
-      toast(m ? "Te mandamos un enlace a "+m+"." : "Te mandamos un enlace a tu mail.");
+      // A propósito no se distingue si el mail existe o no: decirlo serviría
+      // para averiguar quién tiene cuenta en el sitio.
+      abrirModal({eyebrow:"Listo", titulo:"Revisá tu correo",
+        sub:"Si "+m+" tiene una cuenta, le llega un enlace para elegir una contraseña nueva.",
+        body:'<p class="field__hint">El enlace vence en una hora. Si no aparece, mirá en correo no deseado.</p>',
+        ok:"Entendido", cancelar:false,
+        onOk:function(){ cerrarModal(); }});
     }});
 });
+
+// Se llama cuando la persona llega desde el enlace del mail de recuperación.
+// En ese momento Supabase ya le abrió una sesión temporal, así que lo único
+// que falta es que elija la clave nueva.
+function pedirClaveNueva(){
+  abrirModal({eyebrow:"Recuperar acceso", titulo:"Elegí tu contraseña nueva",
+    sub:"Escribila dos veces para evitar errores de tipeo.",
+    body: campo("cnUno","Contraseña nueva","password","")+
+          campo("cnDos","Repetila","password","")+
+          '<p class="field__hint">Al menos 6 caracteres.</p>',
+    ok:"Guardar", cancelar:false,
+    onOk:async function(){
+      var a = val("cnUno"), b = val("cnDos");
+      if(a.length < 6){ toast("La contraseña necesita al menos 6 caracteres."); return; }
+      if(a !== b){ toast("Las dos contraseñas no coinciden."); return; }
+      try {
+        await SyD.auth.cambiarClave(a);
+      } catch(err) {
+        toast(err.message); return;
+      }
+      cerrarModal();
+      toast("Listo, ya podés entrar con tu contraseña nueva.");
+      // Con la clave cambiada la sesión ya es válida: se sigue de largo.
+      try { await entrarConSesionReal(); } catch(err) {}
+    }});
+}
 
 $("#btnLogin").addEventListener("click", async function(){
   var m = val("mail"), p = $("#pass").value, a = $("#loginAlert"), btn = this;
@@ -13932,6 +14040,7 @@ document.addEventListener("click", function(e){
   }
   if(e.target.closest("#btnCrearCuenta")) return crearCuenta();
   if(e.target.closest("#crearVolver") || e.target.closest("#crearVolver2")) return cerrarCrearCuenta();
+  if(e.target.closest("#loginVolver")) return volverDesdeLogin();
   if((t = e.target.closest("[data-ojo]"))){
     var cl = document.getElementById(t.dataset.ojo);
     if(cl){ cl.type = cl.type === "password" ? "text" : "password"; t.classList.toggle("es-abierto", cl.type === "text"); }
@@ -15054,11 +15163,18 @@ try { pintarTodo(); } catch(err){}
 
 // Reacciona a cambios de sesión que pasen DESPUÉS de esta carga inicial:
 // volver de Google, o cerrar sesión desde otra pestaña.
-SyD.auth.onCambioDeSesion(function(sesionSb){
+SyD.auth.onCambioDeSesion(function(sesionSb, evento){
   // Recién ACÁ (después de que supabase-js ya leyó el hash de la URL) se
   // puede limpiar. Si se limpiara antes, se rompe la detección de sesión.
   if(sesionSb && location.hash.indexOf("access_token") !== -1){
     history.replaceState(null, "", location.pathname + location.search);
+  }
+  // Llegó desde el enlace de "recuperar contraseña": no se entra de una, se
+  // le pide primero la clave nueva. Si se entrara directo, la persona quedaría
+  // adentro sin haberla cambiado y el mail no habría servido de nada.
+  if(evento === "PASSWORD_RECOVERY"){
+    pedirClaveNueva();
+    return;
   }
   if(sesionSb && !sesion){
     entrarConSesionReal().catch(function(err){ toast(err.message); });
